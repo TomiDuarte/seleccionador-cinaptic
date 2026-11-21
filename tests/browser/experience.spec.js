@@ -27,10 +27,15 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
     await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   }
   await page.getByRole('radio').nth(2).check();
+  const revealStarted = Date.now();
   await page.getByRole('button', { name: 'Descubrir mi resultado' }).click();
   await expect(page.locator('#reveal-dialog')).toBeVisible();
+  await expect(page.locator('#reveal-dialog')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(page.locator('#reveal-dialog')).toHaveCSS('border-top-width', '0px');
   await page.screenshot({ path: testInfo.outputPath('revelacion.png'), animations: 'disabled' });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Redes');
+  expect(Date.now() - revealStarted).toBeGreaterThanOrEqual(3400);
+  await expect(page.locator('.ticket > p')).toHaveText('Mostrá este código en el stand del CInApTIC y canjealo por un dulce premio');
   const code = await page.locator('.ticket-code').innerText();
   const whatsapp = await page.getByRole('link', { name: 'Compartir por WhatsApp' }).getAttribute('href');
   expect(whatsapp).toContain('https://wa.me/?text=');
@@ -81,9 +86,12 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   await expect(admin.locator('#admin-status')).toContainText('Canje extra registrado');
   await expect(admin.locator('.done')).toHaveCount(2);
   await admin.screenshot({ path: testInfo.outputPath('panel.png'), fullPage: true });
-  await page.getByRole('button', { name: 'Actualizar estado de mi premio' }).click();
+  await expect(page.getByRole('button', { name: 'Actualizar estado de mi premio' })).toHaveCount(0);
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByRole('heading', { name: '¡Premio inicial canjeado!' })).toBeVisible();
   await expect(page.getByRole('heading', { name: '¡Extra canjeado!' })).toBeVisible();
+  await page.getByRole('link', { name: 'Volver al inicio', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu curiosidad');
   await admin.getByRole('button', { name: 'Cerrar sesión' }).click();
   await expect(admin.getByLabel('Contraseña del equipo')).toBeVisible();
   await operator.close();
@@ -167,7 +175,7 @@ test('temas persistentes, logos y confirmación de salida conservan el progreso'
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
 
-test('movimiento reducido y final sin retraso artificial', async ({ page }) => {
+test('movimiento reducido mantiene el tiempo de lectura sin animación', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/#quiz');
   await page.getByLabel('Tu carrera o etapa').selectOption('otra');
@@ -178,8 +186,10 @@ test('movimiento reducido y final sin retraso artificial', async ({ page }) => {
     if (i < 5) await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   }
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '6');
+  const revealStarted = Date.now();
   await page.getByRole('button', { name: 'Descubrir mi resultado' }).click();
   await expect(page.locator('.ticket-code')).toBeVisible();
+  expect(Date.now() - revealStarted).toBeGreaterThanOrEqual(3400);
   await expect(page.locator('.celebration')).toBeHidden();
   expect(await page.locator('.result-header').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
 });

@@ -32,7 +32,7 @@ Para probar desde un teléfono, conectarlo al mismo Wi-Fi y abrir `http://IP-LOC
 7. Panel protegido por contraseña: búsqueda de código, canje inicial y canje extra separado. El extra requiere que el operador confirme haber visto el mensaje o publicación. La web no verifica automáticamente el envío.
 8. Tema claro/oscuro que sigue al sistema inicialmente y conserva la elección manual. Logos institucionales adaptados al fondo, progreso visual, mensajes animados del sombrero y revelación del resultado. Respeta la preferencia de movimiento reducido. Salir con la X pide confirmación y conserva el progreso.
 
-Los visitantes conservan el progreso en su navegador. Si una solicitud falla pueden reintentar. El resultado puede recuperarse al recargar y el estado de canje se actualiza desde el servidor con el botón correspondiente.
+Los visitantes conservan el progreso en su navegador. Si una solicitud falla pueden reintentar. El resultado puede recuperarse al recargar. El estado de canje se actualiza automáticamente al entrar al resultado, volver a la pestaña o recuperar la conexión, y cada 15 segundos mientras se visualiza. La revelación final ocupa la pantalla sin recuadro durante al menos 3,5 segundos para leer el mensaje; con movimiento reducido se mantiene ese tiempo sin animaciones.
 
 ## Operar el stand
 
