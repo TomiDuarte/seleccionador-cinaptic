@@ -1,0 +1,23 @@
+{
+  "name": "cinaptic-noche-universidades",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sombrero de investigación del CInApTIC · UTN FRRe",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "node --watch server/index.mjs",
+    "start": "node server/index.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check server/index.mjs && node --check public/app.js && node --check public/admin.js",
+    "test:e2e": "playwright test",
+    "qr": "node scripts/qr.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "qrcode": "^1.5.4"
+  }
+}

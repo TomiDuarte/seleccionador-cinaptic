@@ -1,0 +1,138 @@
+import { config, lines, careers, questions } from './content.js';
+import { calculateResult, validAnswers, validCareer } from './quiz.js';
+
+const main = document.querySelector('main');
+const storageKey = `cinaptic:${config.eventId}:v1`;
+const esc = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+const paths = {
+  network: '<circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="m10 8-4 8m8-8 4 8M8 19h8"/>',
+  spark: '<path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/>',
+  database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
+  gift: '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13M12 8C3 9 5 0 9 3l3 5Zm0 0c9 1 7-8 3-5l-3 5Z"/>',
+  chat: '<path d="M21 11a9 9 0 0 1-9 9c-2 0-3-.3-5-1l-5 2 2-5a9 9 0 1 1 17-5Z"/><path d="M8 11h8M8 7h5M8 15h5"/>',
+};
+const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.spark}</svg>`;
+const blankState = () => ({ key: [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join(''), career: '', answers: questions.map(() => null), step: 0, ticket: null });
+let state = blankState();
+let storageAvailable = true;
+try {
+  const saved = JSON.parse(localStorage.getItem(storageKey));
+  if (saved && /^[a-f0-9]{64}$/.test(saved.key) && validAnswers(saved.answers, false) &&
+      (saved.career === '' || validCareer(saved.career)) && Number.isInteger(saved.step) && saved.step >= 0 && saved.step <= questions.length) {
+    state = { ...saved, ticket: saved.ticket && /^CN-[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(saved.ticket.code) && validAnswers(saved.ticket.answers) ? { ...saved.ticket, result: calculateResult(saved.ticket.answers) } : null };
+  }
+} catch { storageAvailable = false; }
+function persist() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { storageAvailable = false; } }
+persist();
+let toastTimer;
+function toast(message) { document.querySelector('#toast').textContent = message; clearTimeout(toastTimer); toastTimer = setTimeout(() => { document.querySelector('#toast').textContent = ''; }, 5000); }
+function focusHeading() { const heading = main.querySelector('h1'); if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); } window.scrollTo(0, 0); }
+function renderHome() {
+  const action = state.ticket ? 'Volver a mi resultado' : state.career ? 'Continuar mi descubrimiento' : 'Descubrir mi línea';
+  main.innerHTML = `
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy"><div class="event-badge">✦ &nbsp; LA NOCHE DE LAS UNIVERSIDADES</div>
+      <h1 id="hero-title">Tu curiosidad<br>tiene un <span>lugar.</span></h1>
+      <p>Ponete el sombrero de la investigación y descubrí qué línea del CInApTIC conecta con vos.</p>
+      <a class="button" href="#${state.ticket ? 'resultado' : 'quiz'}">${icon('spark')}${action}</a>
+      <p class="micro">Unos 2 minutos · Sin respuestas incorrectas · Con premio</p></div>
+      <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad."><span class="orbit-tag t1">&lt;/&gt; Agilidad</span><span class="orbit-tag t2">⌁ Redes</span><span class="orbit-tag t3">▤ Base de Datos</span><span class="art-caption">Un poco de magia. Mucha curiosidad.</span></div>
+    </section>
+    <section class="journey" aria-label="Cómo participar">
+      <div class="journey-item">${icon('chat')}<div><strong>Contanos qué te mueve</strong><p>Tu carrera y 6 preguntas cortitas.</p></div></div>
+      <div class="journey-item">${icon('spark')}<div><strong>Encontrá tu conexión</strong><p>Una línea para empezar a explorar.</p></div></div>
+      <div class="journey-item">${icon('gift')}<div><strong>Llevate algo dulce</strong><p>Mostrá tu código en el stand.</p></div></div>
+    </section>
+    <section class="lines-section" id="lineas" aria-labelledby="lines-title"><div class="section-intro"><div><span class="eyebrow">Un centro, muchas preguntas</span><h2 id="lines-title">¿Y si tu próxima idea<br>empieza acá?</h2></div><p>Somos el Centro de Investigación Aplicada en Tecnologías de la Información y Comunicación de la UTN FRRe. Conocé nuestras líneas.</p></div>
+      <div class="line-grid">${lines.map(line => `<article class="line-card ${line.id}"><div class="line-icon">${icon(line.icon)}</div><h3>${line.name}</h3><p class="tagline">${line.label}</p><p class="description">${line.description}</p><div class="tags">${line.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div><details><summary>Una idea para investigar</summary><p>${line.challenge}</p><p>${line.project}</p></details></article>`).join('')}</div>
+      <p class="about-note">Los ejemplos son puertas de entrada a cada tema. Podés explorar más de una línea. <a href="${config.officialUrl}" target="_blank" rel="noopener noreferrer">Ver proyectos en la web oficial</a>.</p>
+    </section>
+    <section class="invitation"><div><h2>No necesitás tener todas las respuestas.</h2><p>Traé tus preguntas. Acercate al stand, conocé al equipo y conversemos sobre cómo podrías participar.</p></div><a class="button" href="#quiz">Me sumo a explorar</a></section>
+    <section class="faq"><h2>Antes de ponerte el sombrero…</h2>
+      <details><summary>¿Tengo que estudiar Sistemas para participar?</summary><p>No. El juego está abierto a todas las carreras y a quienes todavía están eligiendo. Tu carrera no limita el resultado. En el stand podés consultar las posibilidades de participación en el centro.</p></details>
+      <details><summary>¿Cómo canjeo el premio y el extra?</summary><p>Al terminar recibís un código. Mostralo en el stand para canjearlo por ${config.reward}, sujeto a disponibilidad. Cada código admite un canje inicial y uno extra. Para el extra, compartí la experiencia por WhatsApp y mostrá el mensaje enviado al equipo. No hace falta mostrar el resto de tu conversación.</p></details>
+      <details><summary>¿Qué pasa con mis respuestas?</summary><p>No pedimos nombre, teléfono ni correo. Guardamos la carrera, las respuestas, un identificador aleatorio y el estado de canje en el servidor. Este navegador conserva tu progreso y el acceso al código. No usamos rastreadores ni leemos tus mensajes de WhatsApp.</p></details>
+      <details><summary>¿El resultado decide dónde puedo investigar?</summary><p>Es una recomendación lúdica a partir de tus intereses, no una evaluación vocacional ni una asignación al centro. Las preguntas y sus puntajes se diseñaron para esta experiencia. Si te interesan varias líneas, ¡conversemos sobre todas!</p></details>
+    </section>`;
+}
+
+function renderQuiz() {
+  if (state.ticket) { location.hash = 'resultado'; return; }
+  const step = state.step;
+  const question = questions[step - 1];
+  main.innerHTML = `<section class="quiz-shell"><div class="quiz-top"><a href="#inicio">Salir al inicio</a><span>Paso ${step + 1} de ${questions.length + 1}</span></div><div class="progress" role="progressbar" aria-label="Progreso del cuestionario" aria-valuemin="0" aria-valuemax="7" aria-valuenow="${step}"><div class="progress-fill step-${step}"></div></div>
+    <span class="eyebrow">${step ? 'Seguí tu curiosidad' : 'Primero, nos conocemos'}</span>
+    <h1>${step ? question.title : '¿Qué estás estudiando?'}</h1><p class="question-subtitle">${step ? question.subtitle : 'Todas las curiosidades tienen lugar. Contanos desde dónde venís.'}</p>
+    <form id="quiz-form">${step ? `<fieldset class="options"><legend class="sr-only">${question.title}</legend>${question.options.map((option, i) => `<label class="option"><input type="radio" name="answer" value="${i}" ${state.answers[step - 1] === i ? 'checked' : ''} required><span>${option.text}</span></label>`).join('')}</fieldset>` : `<label class="field-label" for="career">Tu carrera o etapa</label><div class="select-wrap"><select name="career" id="career" required><option value="">Elegí una opción</option>${careers.map(([id, name]) => `<option value="${id}" ${state.career === id ? 'selected' : ''}>${name}</option>`).join('')}</select></div><p class="career-note">${icon('spark')} No necesitás experiencia en investigación. Tu carrera no determina tu resultado.</p>`}
+    <div id="quiz-error" class="error" role="alert"></div><div class="quiz-actions"><button class="text-button" type="button" id="back">${step ? 'Volver' : 'Ir al inicio'}</button><button class="button" type="submit" id="next" ${step ? state.answers[step - 1] === null ? 'disabled' : '' : !state.career ? 'disabled' : ''}>${step === questions.length ? 'Descubrir mi resultado' : 'Continuar'}</button></div></form>
+    <p class="quiz-note">${step ? 'No hay respuestas correctas. Elegí lo que te represente.' : 'Sin nombre, teléfono ni correo. Solo tu curiosidad.'}</p></section>`;
+  document.querySelector('#quiz-form').addEventListener('change', event => {
+    if (event.target.name === 'career') state.career = event.target.value;
+    else state.answers[step - 1] = Number(event.target.value);
+    document.querySelector('#next').disabled = false; persist();
+  });
+  document.querySelector('#back').onclick = () => { if (step) { state.step--; persist(); renderQuiz(); focusHeading(); } else location.hash = 'inicio'; };
+  document.querySelector('#quiz-form').onsubmit = async event => {
+    event.preventDefault();
+    if (!step && !validCareer(state.career)) return;
+    if (step && state.answers[step - 1] === null) return;
+    if (step < questions.length) { state.step++; persist(); renderQuiz(); focusHeading(); return; }
+    const button = document.querySelector('#next'); button.disabled = true; button.textContent = 'Consultando al sombrero…';
+    document.querySelector('#back').disabled = true;
+    try {
+      const ticket = await api('/api/participations', { method: 'POST', body: JSON.stringify({ key: state.key, career: state.career, answers: state.answers }) });
+      state.ticket = ticket; persist(); location.hash = 'resultado';
+    } catch (error) {
+      const errorBox = document.querySelector('#quiz-error');
+      if (errorBox) { errorBox.textContent = error.message; button.disabled = false; button.textContent = 'Reintentar'; document.querySelector('#back').disabled = false; }
+    }
+  };
+}
+
+async function api(path, options = {}) {
+  let response;
+  try { response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers }, signal: AbortSignal.timeout(15000) }); }
+  catch { throw new Error('No pudimos conectar. Tus respuestas siguen acá: comprobá tu conexión y volvé a intentar.'); }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'No pudimos completar la operación.');
+  return data;
+}
+
+function renderResult() {
+  if (!state.ticket) { location.hash = 'quiz'; return; }
+  const ticket = state.ticket;
+  const matching = ticket.result.topIds.map(id => lines.find(line => line.id === id));
+  const tied = matching.length > 1;
+  main.innerHTML = `<section class="result-shell"><header class="result-header"><div class="result-star" aria-hidden="true">✦</div><span class="eyebrow">El sombrero encontró tu conexión</span><h1>${tied ? '¡Curiosidad sin fronteras!' : matching[0].name}</h1><p>${tied ? `Tus respuestas conectan por igual con ${matching.map(line => line.name).join(' y ')}. Tenés más de un camino para explorar.` : matching[0].match}</p></header>
+    <div class="result-grid"><section class="result-panel"><h2>Lo que despertó tu curiosidad</h2><p>Así se repartieron tus ${questions.length} elecciones. Es una invitación a explorar.</p>${ticket.result.ranking.map(item => `<div class="score-row"><span>${lines.find(line => line.id === item.id).name}</span><span>${item.score} de ${questions.length}</span></div><progress class="score-bar" max="${questions.length}" value="${item.score}" aria-label="${lines.find(line => line.id === item.id).name}: ${item.score} de ${questions.length}"></progress>`).join('')}<div class="result-project">${matching.map(line => `<p><strong>${line.name}</strong><br>${line.project}</p>`).join('')}<a href="${config.officialUrl}" target="_blank" rel="noopener noreferrer">Explorá los proyectos del centro</a></div></section>
+    <div><section class="ticket"><span class="eyebrow">Tu pase al lado dulce</span><h2>${ticket.baseAt ? '¡Premio inicial canjeado!' : 'La curiosidad tiene premio.'}</h2><p>${ticket.baseAt ? 'Este código ya registró su primer canje.' : `Mostrá este código en el stand del CInApTIC y canjealo por ${config.reward}.`}</p><code class="ticket-code">${esc(ticket.code)}</code><button class="button small full" id="copy-code">Copiar mi código</button><small>Un canje inicial y un extra por código. Sujeto a disponibilidad. Guardá una captura para tenerlo a mano.</small></section>
+    <section class="share-panel"><h3>${icon('gift')} ${ticket.bonusAt ? '¡Extra canjeado!' : 'Compartí la curiosidad.'}</h3><p>${ticket.bonusAt ? 'El stand ya registró tu premio por compartir.' : 'Invitá a alguien por WhatsApp. Mostrá el mensaje enviado en el stand y llevate un premio extra.'}</p><a class="button mint small full" id="share" href="${shareUrl(matching)}" target="_blank" rel="noopener noreferrer">Compartir por WhatsApp</a><p class="privacy-note">Vos elegís a quién enviarlo. No incluimos tu código de canje.</p></section></div></div>
+    <section class="result-contact"><span class="eyebrow">Esto puede ser el comienzo</span><h2>¿Seguimos esta conversación?</h2><p>Mostranos tu resultado en el stand. Conocé al equipo y consultá cómo dar tus primeros pasos en investigación.</p>${config.contactUrl ? `<a class="button" href="${esc(config.contactUrl)}" target="_blank" rel="noopener noreferrer">Quiero sumarme al CInApTIC</a>` : `<a class="button" href="#lineas">Conocer las tres líneas</a>`}<button class="text-button" id="refresh-ticket">Actualizar estado de mi premio</button><a class="text-button" href="#inicio">Volver al inicio</a></section>
+    <p class="privacy-note">Este resultado es orientativo. La carrera no suma ni resta puntos. Tu código queda asociado a este navegador; conservá una captura.</p><p class="error" id="result-error" role="alert"></p></section>`;
+  document.querySelector('#copy-code').onclick = async () => {
+    try { await navigator.clipboard.writeText(ticket.code); toast('Código copiado. ¡Nos vemos en el stand!'); }
+    catch { toast('Mantené presionado el código para copiarlo o guardá una captura.'); }
+  };
+  document.querySelector('#share').onclick = () => toast('Después de enviar el mensaje, mostralo en el stand para el extra.');
+  document.querySelector('#refresh-ticket').onclick = async () => {
+    const button = document.querySelector('#refresh-ticket'); button.disabled = true;
+    try { state.ticket = await api('/api/participation', { headers: { Authorization: `Bearer ${state.key}` } }); persist(); renderResult(); toast('Estado del premio actualizado.'); }
+    catch (error) { document.querySelector('#result-error').textContent = error.message; button.disabled = false; }
+  };
+  if (!storageAvailable) toast('El navegador no permite guardar el progreso. Guardá una captura de tu código.');
+}
+
+function shareUrl(matching) {
+  const url = config.publicUrl || `${location.origin}/`;
+  const text = `¡Mi curiosidad conecta con ${matching.map(line => line.name).join(' y ')}! ✨ Descubrí tu línea de investigación en el CInApTIC de la UTN FRRe. Probá el sombrero de la Noche de las Universidades: ${url}`;
+  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+}
+
+function route() {
+  if (location.hash === '#quiz') renderQuiz();
+  else if (location.hash === '#resultado') renderResult();
+  else { renderHome(); if (location.hash === '#lineas') { document.querySelector('#lineas').scrollIntoView(); return; } }
+  focusHeading();
+}
+window.addEventListener('hashchange', route);
+route();
