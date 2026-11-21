@@ -38,7 +38,6 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     const json = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
     try {
-      const store = await storeReady;
       const url = new URL(req.url, 'http://localhost');
       if (!url.pathname.startsWith('/api/')) {
         if (!['GET', 'HEAD'].includes(req.method)) return json(405, { error: 'Método no permitido.' });
@@ -52,6 +51,8 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
           return res.end(req.method === 'HEAD' ? undefined : body);
         } catch { return json(404, { error: 'No encontrado.' }); }
       }
+      if (url.pathname === '/api/health' && req.method === 'GET') return json(200, { ok: true, database: postgresUrl ? 'postgres' : 'sqlite' });
+      const store = await storeReady;
       if (!['GET', 'POST'].includes(req.method)) return json(405, { error: 'Método no permitido.' });
       let body = {};
       if (req.method === 'POST') {
@@ -72,7 +73,6 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         ? token && await store.authenticated(token)
         : token && sessions.get(token) > Date.now();
       const cookie = (value, age) => `cinaptic_session=${value}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${age}${secureCookie ? '; Secure' : ''}`;
-      if (url.pathname === '/api/health' && req.method === 'GET') return json(200, { ok: true });
       if (url.pathname === '/api/participations' && req.method === 'POST') {
         // High enough for a shared campus Wi-Fi/NAT; not a one-person identity guarantee.
         limit(`issue:${ip}`, 300, 60000);
