@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, extname, sep } from 'node:path';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
-import { createPostgresStore, createStore } from './store.mjs';
+import { createPostgresStore } from './store.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(resolve(root, '.env'))) {
@@ -18,7 +18,9 @@ const digest = value => createHash('sha256').update(value).digest();
 
 export function createApp({ database = resolve(root, process.env.DATABASE_PATH || '.data/cinaptic.sqlite'), password = process.env.ADMIN_PASSWORD || '', secureCookie = process.env.COOKIE_SECURE === 'true' } = {}) {
   const postgresUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-  const storeReady = postgresUrl ? createPostgresStore(postgresUrl) : Promise.resolve(createStore(database));
+  const storeReady = postgresUrl
+    ? createPostgresStore(postgresUrl)
+    : import('./store.sqlite.mjs').then(({ createStore }) => createStore(database));
   const sessions = new Map();
   const limits = new Map();
   const limit = (key, max, windowMs) => {

@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, basename, sep } from 'node:path';
 import { createApp } from '../server/index.mjs';
-import { createStore } from '../server/store.mjs';
+import { createStore } from '../server/store.sqlite.mjs';
 
 const answers = [0,2,1,0,1,2];
 const key = () => randomBytes(32).toString('hex');
