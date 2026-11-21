@@ -82,6 +82,18 @@ npm run qr -- https://TU-DOMINIO/
 
 Se crea `.data/qr-evento.svg`, con margen para impresión. No hay un QR definitivo hasta disponer de una URL real. Probarlo con datos móviles y revisar el flujo de WhatsApp en un teléfono antes de imprimirlo.
 
+### Despliegue en Vercel
+
+El proyecto incluye `api/index.mjs` y `vercel.json`. Para producción hay que crear una integración de Neon desde Vercel y configurar las variables del proyecto:
+
+- `DATABASE_URL`: URL de PostgreSQL proporcionada por la integración de Neon.
+- `ADMIN_PASSWORD`: contraseña larga del panel.
+- `COOKIE_SECURE=true`.
+
+También puede aparecer como `POSTGRES_URL`; el servidor acepta ambos nombres. El adaptador crea automáticamente las tablas necesarias y conserva participaciones y canjes en PostgreSQL.
+
+En el repositorio de GitHub, importá el proyecto en Vercel y desplegá la rama `main`. El build no necesita una base de datos SQLite local ni disco persistente. No configurés `DATABASE_PATH` en Vercel.
+
 ## Verificación
 
 ```sh

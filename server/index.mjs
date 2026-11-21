@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, extname, sep } from 'node:path';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
-import { createStore } from './store.mjs';
+import { createPostgresStore, createStore } from './store.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(resolve(root, '.env'))) {
@@ -17,7 +17,8 @@ const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const digest = value => createHash('sha256').update(value).digest();
 
 export function createApp({ database = resolve(root, process.env.DATABASE_PATH || '.data/cinaptic.sqlite'), password = process.env.ADMIN_PASSWORD || '', secureCookie = process.env.COOKIE_SECURE === 'true' } = {}) {
-  const store = createStore(database);
+  const postgresUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const storeReady = postgresUrl ? createPostgresStore(postgresUrl) : Promise.resolve(createStore(database));
   const sessions = new Map();
   const limits = new Map();
   const limit = (key, max, windowMs) => {
@@ -35,6 +36,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     const json = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
     try {
+      const store = await storeReady;
       const url = new URL(req.url, 'http://localhost');
       if (!url.pathname.startsWith('/api/')) {
         if (!['GET', 'HEAD'].includes(req.method)) return json(405, { error: 'Método no permitido.' });
@@ -64,16 +66,18 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
       }
       const ip = req.socket.remoteAddress;
       const token = req.headers.cookie?.match(/(?:^|;\s*)cinaptic_session=([a-f0-9]{64})(?:;|$)/)?.[1];
-      const authenticated = token && sessions.get(token) > Date.now();
+      const authenticated = postgresUrl
+        ? token && await store.authenticated(token)
+        : token && sessions.get(token) > Date.now();
       const cookie = (value, age) => `cinaptic_session=${value}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${age}${secureCookie ? '; Secure' : ''}`;
       if (url.pathname === '/api/health' && req.method === 'GET') return json(200, { ok: true });
       if (url.pathname === '/api/participations' && req.method === 'POST') {
         // High enough for a shared campus Wi-Fi/NAT; not a one-person identity guarantee.
         limit(`issue:${ip}`, 300, 60000);
-        return json(200, store.issue(body.key, body.career, body.answers));
+        return json(200, await store.issue(body.key, body.career, body.answers));
       }
       if (url.pathname === '/api/participation' && req.method === 'GET') {
-        const own = store.own(req.headers.authorization?.replace(/^Bearer /, ''));
+        const own = await store.own(req.headers.authorization?.replace(/^Bearer /, ''));
         return json(own ? 200 : 404, own || { error: 'Todavía no tenés un resultado guardado.' });
       }
       if (url.pathname === '/api/admin/login' && req.method === 'POST') {
@@ -83,22 +87,25 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         for (const [key, expiry] of sessions) if (expiry < Date.now()) sessions.delete(key);
         const newToken = randomBytes(32).toString('hex');
         sessions.set(newToken, Date.now() + 8 * 60 * 60000);
+        if (postgresUrl) await store.createSession(newToken, Date.now() + 8 * 60 * 60000);
         res.setHeader('Set-Cookie', cookie(newToken, 8 * 3600));
         return json(200, { ok: true });
       }
       if (url.pathname.startsWith('/api/admin/')) {
         if (!authenticated) return json(401, { error: 'Ingresá al panel para continuar.' });
         if (url.pathname === '/api/admin/logout' && req.method === 'POST') {
-          sessions.delete(token); res.setHeader('Set-Cookie', cookie('', 0)); return json(200, { ok: true });
+          sessions.delete(token);
+          if (postgresUrl) await store.logout(token);
+          res.setHeader('Set-Cookie', cookie('', 0)); return json(200, { ok: true });
         }
-        if (url.pathname === '/api/admin/stats' && req.method === 'GET') return json(200, store.stats());
+        if (url.pathname === '/api/admin/stats' && req.method === 'GET') return json(200, await store.stats());
         if (url.pathname === '/api/admin/coupon' && req.method === 'GET') {
-          const result = store.lookup((url.searchParams.get('code') || '').trim().toUpperCase());
+          const result = await store.lookup((url.searchParams.get('code') || '').trim().toUpperCase());
           return json(result ? 200 : 404, result || { error: 'No encontramos ese código. Revisá las letras y los números.' });
         }
         if (url.pathname === '/api/admin/redeem' && req.method === 'POST') {
           if (typeof body.code !== 'string') return json(400, { error: 'Código inválido.' });
-          return json(200, store.redeem(body.code.trim().toUpperCase(), body.kind, body.confirmed));
+          return json(200, await store.redeem(body.code.trim().toUpperCase(), body.kind, body.confirmed));
         }
       }
       return json(404, { error: 'No encontrado.' });
@@ -108,7 +115,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
       else res.end();
     }
   });
-  server.on('close', () => store.close());
+  server.on('close', () => storeReady.then(store => store.close()));
   return server;
 }
 
