@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, basename, sep } from 'node:path';
 import { createApp } from '../server/index.mjs';
 import { createStore } from '../server/store.sqlite.mjs';
+import { createMemoryStore } from '../server/store.memory.mjs';
 
 const answers = [0,2,1,0,1,2];
 const key = () => randomBytes(32).toString('hex');
@@ -82,6 +83,16 @@ test('el código y los canjes sobreviven a reiniciar la base', () => {
     assert.ok(target.startsWith(resolve(tmpdir()) + sep) && basename(target).startsWith('cinaptic-test-'));
     rmSync(target, { recursive: true, force: true });
   }
+});
+test('el almacén temporal emite, consulta y canjea participaciones', () => {
+  const store = createMemoryStore();
+  const participant = key();
+  const ticket = store.issue(participant, 'sistemas', answers);
+  assert.equal(store.own(participant).code, ticket.code);
+  assert.equal(store.lookup(ticket.code).code, ticket.code);
+  store.redeem(ticket.code, 'base');
+  assert.equal(store.lookup(ticket.code).baseAt !== null, true);
+  assert.deepEqual(store.stats(), { participants: 1, redeemed: 1, extras: 0 });
 });
 test('sirve sitio, panel y recursos con políticas del navegador', async t => {
   const { request } = await withApp(t);

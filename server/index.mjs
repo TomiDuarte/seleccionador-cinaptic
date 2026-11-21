@@ -25,7 +25,9 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
     process.env.NEON_DATABASE_URL;
   const storeReady = postgresUrl
     ? createPostgresStore(postgresUrl)
-    : import('./store.sqlite.mjs').then(({ createStore }) => createStore(database));
+    : process.env.VERCEL
+      ? import('./store.memory.mjs').then(({ createMemoryStore }) => createMemoryStore())
+      : import('./store.sqlite.mjs').then(({ createStore }) => createStore(database));
   const sessions = new Map();
   const limits = new Map();
   const limit = (key, max, windowMs) => {
@@ -56,7 +58,10 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
           return res.end(req.method === 'HEAD' ? undefined : body);
         } catch { return json(404, { error: 'No encontrado.' }); }
       }
-      if (url.pathname === '/api/health' && req.method === 'GET') return json(200, { ok: true, database: postgresUrl ? 'postgres' : 'sqlite' });
+      if (url.pathname === '/api/health' && req.method === 'GET') return json(200, {
+        ok: true,
+        database: postgresUrl ? 'postgres' : process.env.VERCEL ? 'memory' : 'sqlite',
+      });
       const store = await storeReady;
       if (!['GET', 'POST'].includes(req.method)) return json(405, { error: 'Método no permitido.' });
       let body = {};
@@ -74,7 +79,8 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
       }
       const ip = req.socket.remoteAddress;
       const token = req.headers.cookie?.match(/(?:^|;\s*)cinaptic_session=([a-f0-9]{64})(?:;|$)/)?.[1];
-      const authenticated = postgresUrl
+      const persistentStore = Boolean(postgresUrl);
+      const authenticated = persistentStore || process.env.VERCEL
         ? token && await store.authenticated(token)
         : token && sessions.get(token) > Date.now();
       const cookie = (value, age) => `cinaptic_session=${value}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${age}${secureCookie ? '; Secure' : ''}`;
@@ -94,7 +100,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         for (const [key, expiry] of sessions) if (expiry < Date.now()) sessions.delete(key);
         const newToken = randomBytes(32).toString('hex');
         sessions.set(newToken, Date.now() + 8 * 60 * 60000);
-        if (postgresUrl) await store.createSession(newToken, Date.now() + 8 * 60 * 60000);
+        if (persistentStore || process.env.VERCEL) await store.createSession(newToken, Date.now() + 8 * 60 * 60000);
         res.setHeader('Set-Cookie', cookie(newToken, 8 * 3600));
         return json(200, { ok: true });
       }
@@ -102,7 +108,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         if (!authenticated) return json(401, { error: 'Ingresá al panel para continuar.' });
         if (url.pathname === '/api/admin/logout' && req.method === 'POST') {
           sessions.delete(token);
-          if (postgresUrl) await store.logout(token);
+          if (persistentStore || process.env.VERCEL) await store.logout(token);
           res.setHeader('Set-Cookie', cookie('', 0)); return json(200, { ok: true });
         }
         if (url.pathname === '/api/admin/stats' && req.method === 'GET') return json(200, await store.stats());
