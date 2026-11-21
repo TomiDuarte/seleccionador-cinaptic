@@ -17,7 +17,12 @@ const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const digest = value => createHash('sha256').update(value).digest();
 
 export function createApp({ database = resolve(root, process.env.DATABASE_PATH || '.data/cinaptic.sqlite'), password = process.env.ADMIN_PASSWORD || '', secureCookie = process.env.COOKIE_SECURE === 'true' } = {}) {
-  const postgresUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  const postgresUrl =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.NEON_DATABASE_URL;
   const storeReady = postgresUrl
     ? createPostgresStore(postgresUrl)
     : import('./store.sqlite.mjs').then(({ createStore }) => createStore(database));
