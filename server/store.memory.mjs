@@ -91,3 +91,9 @@ export function createMemoryStore() {
     },
   };
 }
+
+let sharedStore;
+export function getSharedMemoryStore() {
+  sharedStore ||= createMemoryStore();
+  return sharedStore;
+}

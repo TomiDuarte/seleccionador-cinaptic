@@ -26,7 +26,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
   const storeReady = postgresUrl
     ? createPostgresStore(postgresUrl)
     : process.env.VERCEL
-      ? import('./store.memory.mjs').then(({ createMemoryStore }) => createMemoryStore())
+      ? import('./store.memory.mjs').then(({ getSharedMemoryStore }) => getSharedMemoryStore())
       : import('./store.sqlite.mjs').then(({ createStore }) => createStore(database));
   const sessions = new Map();
   const limits = new Map();
@@ -124,7 +124,9 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
       return json(404, { error: 'No encontrado.' });
     } catch (error) {
       if (!error.status) console.error('Error de solicitud:', error.message);
-      if (!res.headersSent) json(error.status || 500, { error: error.status ? error.message : 'No pudimos completar la operación. Volvé a intentar.' });
+      if (!res.headersSent) json(error.status || 500, {
+        error: error.status ? error.message : (process.env.VERCEL ? error.message : 'No pudimos completar la operación. Volvé a intentar.'),
+      });
       else res.end();
     }
   });
