@@ -5,17 +5,21 @@
   <meta name="theme-color" content="#101c19">
   <meta name="description" content="Descubrí qué línea de investigación del CInApTIC conecta con tu curiosidad. Una experiencia para la Noche de las Universidades · UTN FRRe.">
   <title>Tu curiosidad tiene un lugar · CInApTIC</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/styles.css">
+  <script src="/theme.js"></script>
+  <link rel="icon" href="/assets/cinaptic-symbol.png" type="image/png"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/experience.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#main">Saltar al contenido</a>
   <header class="site-header">
-    <a class="brand" href="/" aria-label="CInApTIC, inicio"><span class="brand-symbol" aria-hidden="true">c<span>✳</span></span><span>CInApTIC<small>UTN · Facultad Regional Resistencia</small></span></a>
-    <nav aria-label="Navegación principal"><a href="/#lineas">El centro</a><a class="header-pill" href="/#quiz">Encontrá tu línea <span aria-hidden="true">✦</span></a></nav>
+    <a class="brand" href="/" aria-label="CInApTIC, inicio"><img class="brand-logo logo-dark" src="/assets/cinaptic-white.png" width="990" height="294" alt="CInApTIC"><img class="brand-logo logo-light" src="/assets/cinaptic-color.png" width="990" height="294" alt="CInApTIC"></a>
+    <nav aria-label="Navegación principal"><a class="center-link" href="https://www.frre.utn.edu.ar/secretaria_de_ciencia_y_tecnologia/investigacion/CInApTIC/" target="_blank" rel="noopener noreferrer">El centro</a><a class="header-pill" href="/#quiz">Encontrá tu línea <span aria-hidden="true">✦</span></a><button class="theme-toggle" type="button" aria-label="Cambiar tema"><svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg><svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14A8.5 8.5 0 0 1 10 4a8.5 8.5 0 1 0 10 10Z"/></svg></button></nav>
   </header>
   <main id="main" tabindex="-1"></main>
-  <footer class="site-footer"><span>CInApTIC <span class="muted">/ UTN FRRe</span></span><a href="https://www.frre.utn.edu.ar/secretaria_de_ciencia_y_tecnologia/investigacion/CInApTIC/" target="_blank" rel="noopener noreferrer">Conocé el centro en la web de UTN</a><span>La curiosidad es un buen comienzo.</span></footer>
+  <footer class="site-footer"><span>CInApTIC <span class="muted">/ UTN FRRe</span></span><a class="university-link" href="https://www.frre.utn.edu.ar/" target="_blank" rel="noopener noreferrer" aria-label="Visitar la web de UTN Facultad Regional Resistencia"><img class="university-logo logo-dark" src="/assets/utn-white.png" width="1748" height="536" alt="UTN Facultad Regional Resistencia"><img class="university-logo logo-light" src="/assets/utn-color.png" width="1748" height="536" alt="UTN Facultad Regional Resistencia"></a><span>La curiosidad es un buen comienzo.</span></footer>
+  <dialog id="exit-dialog" class="experience-dialog" aria-labelledby="exit-title"><img class="dialog-hat" src="/hat.svg" width="560" height="520" alt=""><h2 id="exit-title">¿Seguro que quieres salir del cuestionario?</h2><p>Tu progreso queda guardado para cuando vuelvas.</p><div class="dialog-actions"><button id="confirm-exit" class="button danger" type="button">Salir</button><button id="keep-playing" class="button" type="button" autofocus>¡Quedarme!</button></div></dialog>
+  <dialog id="reveal-dialog" class="experience-dialog reveal-dialog" aria-labelledby="reveal-title"><div class="reveal-art"><img src="/hat.svg" width="560" height="520" alt="Sombrero descubriendo tu línea"><span aria-hidden="true">✦</span><span aria-hidden="true">✧</span><span aria-hidden="true">✦</span></div><h2 id="reveal-title">¡Tu próxima gran idea está cerca!</h2><p role="status">El sombrero está descubriendo tu conexión…</p></dialog>
+  <dialog id="share-dialog" class="experience-dialog" aria-labelledby="share-title"><button class="close-button dialog-close" type="button" aria-label="Cerrar opciones para compartir">×</button><h2 id="share-title">Compartí tu descubrimiento</h2><p id="share-help"></p><label class="field-label" for="share-message">Tu invitación</label><textarea id="share-message" readonly rows="5"></textarea><div class="dialog-actions"><button class="button" id="copy-invitation" type="button">Copiar invitación</button><a class="button secondary" id="open-instagram" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Abrir Instagram</a></div><p class="share-feedback" role="status"></p></dialog>
   <div id="toast" class="toast" role="status"></div>
   <noscript><p class="noscript">Activá JavaScript para participar del cuestionario. También podés acercarte al stand del CInApTIC para conocer las líneas de investigación.</p></noscript>
 </body>

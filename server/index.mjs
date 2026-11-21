@@ -13,7 +13,7 @@ if (existsSync(resolve(root, '.env'))) {
     if (match && process.env[match[1]] === undefined) process.env[match[1]] = match[2];
   }
 }
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const digest = value => createHash('sha256').update(value).digest();
 
 export function createApp({ database = resolve(root, process.env.DATABASE_PATH || '.data/cinaptic.sqlite'), password = process.env.ADMIN_PASSWORD || '', secureCookie = process.env.COOKIE_SECURE === 'true' } = {}) {

@@ -28,8 +28,9 @@ Para probar desde un teléfono, conectarlo al mismo Wi-Fi y abrir `http://IP-LOC
 3. Seis preguntas situacionales. Cada elección suma un punto a una línea; la carrera no condiciona el resultado.
 4. Resultado explicado, distribución de elecciones y empates explícitos. Es una actividad de divulgación, no un instrumento vocacional validado.
 5. Código aleatorio emitido en el servidor y persistido en SQLite. Repetir la solicitud con el mismo identificador devuelve el mismo código y resultado.
-6. Invitación por WhatsApp que comparte el resultado y la URL, sin divulgar el código de canje.
-7. Panel protegido por contraseña: búsqueda de código, canje inicial y canje extra separado. El extra requiere que el operador confirme haber visto el mensaje enviado. La web no puede verificar el envío de WhatsApp.
+6. Invitación por WhatsApp, X, enlace copiable y menú nativo de compartir. Instagram permite copiar la invitación y abrir la app/web para pegarla en un mensaje. No se divulga el código de canje. Las apps disponibles en el menú nativo dependen del dispositivo; si no está disponible se ofrece copiar el texto.
+7. Panel protegido por contraseña: búsqueda de código, canje inicial y canje extra separado. El extra requiere que el operador confirme haber visto el mensaje o publicación. La web no verifica automáticamente el envío.
+8. Tema claro/oscuro que sigue al sistema inicialmente y conserva la elección manual. Logos institucionales adaptados al fondo, progreso visual, mensajes animados del sombrero y revelación del resultado. Respeta la preferencia de movimiento reducido. Salir con la X pide confirmación y conserva el progreso.
 
 Los visitantes conservan el progreso en su navegador. Si una solicitud falla pueden reintentar. El resultado puede recuperarse al recargar y el estado de canje se actualiza desde el servidor con el botón correspondiente.
 
@@ -38,7 +39,7 @@ Los visitantes conservan el progreso en su navegador. Si una solicitud falla pue
 1. Abrir `/admin` en los dispositivos del equipo e ingresar la contraseña configurada.
 2. Escribir el código que muestra el visitante y tocar **Consultar**.
 3. Tocar **Confirmar canje inicial**. Entregar el premio cuando aparezca la confirmación de registro.
-4. Para el extra, pedir que muestre únicamente el mensaje enviado con la invitación, marcar la comprobación y confirmar el canje extra.
+4. Para el extra, pedir que muestre el mensaje o publicación con la invitación, marcar la comprobación y confirmar el canje extra.
 5. Si se pierde la conexión, consultar nuevamente el código antes de entregar. Una solicitud puede haberse registrado aunque no llegara la respuesta.
 
 Las actualizaciones son condicionales y atómicas: dos operadores simultáneos no pueden registrar dos veces el mismo premio. Un canje inicial y uno extra por código. Las sesiones del equipo duran hasta ocho horas y se cierran al reiniciar el servidor.
@@ -59,7 +60,7 @@ Todo el contenido del cuestionario está en `public/content.js`:
 | `config.reward` | Texto del premio según disponibilidad |
 | `config.eventId` | Identificador de la edición del evento |
 
-La identidad visual y el sombrero SVG son una propuesta original para esta actividad, no logotipos institucionales oficiales. El frontend usa archivos locales, sin fuentes ni imágenes cargadas de terceros.
+Los logos de CInApTIC y UTN FRRe provienen de la carpeta `LogosCinaptic` proporcionada por el usuario; las variantes utilizadas se copiaron sin alterar a `public/assets`. El sombrero SVG es una ilustración original para la actividad. El frontend usa archivos locales, sin fuentes ni imágenes cargadas de terceros. Los temas y animaciones están en `public/theme.js` y `public/experience.css`.
 
 **Congelar preguntas, orden de opciones y puntajes antes del evento.** Las participaciones guardan índices de respuesta: no cambiar esos significados después de emitir códigos. Para una futura edición, usar un nuevo `eventId` y archivar la base anterior; una evolución con varios cuestionarios simultáneos requeriría versionarlos en la base.
 
@@ -91,7 +92,7 @@ npm run test:e2e
 
 Las pruebas unitarias y de API cubren los 729 recorridos del cuestionario, empates, entradas inválidas, emisión idempotente, acceso privado, autenticación, canjes concurrentes, comprobación del extra, límites de login y persistencia tras reinicio.
 
-Playwright prueba celular de 390 px y escritorio, y verifica también 320 px, navegación por teclado, recuperación del progreso, reintento sin conexión, enlaces de WhatsApp y el flujo de canje. En Windows usa Edge instalado; en otros sistemas instalar Chromium con `npx playwright install chromium`. `PLAYWRIGHT_CHANNEL` permite elegir otro canal instalado. Las pruebas levantan un servidor aislado en `127.0.0.1:3107`, con base en memoria y contraseña exclusiva de pruebas; no tocan los canjes reales.
+Playwright prueba celular de 390 px y escritorio, y verifica también 320 px, navegación por teclado, recuperación del progreso, reintento sin conexión, temas persistentes, logos, confirmación al salir, movimiento reducido, opciones de compartir y el flujo de canje. Las interfaces de portapapeles y compartir se simulan en las pruebas; no se envían mensajes reales. En Windows usa Edge instalado; en otros sistemas instalar Chromium con `npx playwright install chromium`. `PLAYWRIGHT_CHANNEL` permite elegir otro canal instalado. Las pruebas levantan un servidor aislado en `127.0.0.1:3107`, con base en memoria y contraseña exclusiva de pruebas; no tocan los canjes reales.
 
 Capturas y trazas: `test-results/` (excluido de Git). Se verificó la apertura del enlace de compartir como URL; enviar mensajes reales y la cámara de QR requieren prueba manual en el dispositivo del evento.
 

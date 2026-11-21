@@ -1,6 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async ({ page, browser }, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.copiedText = text; } } });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { window.sharedData = data; } });
+  });
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
@@ -24,12 +28,39 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   }
   await page.getByRole('radio').nth(2).check();
   await page.getByRole('button', { name: 'Descubrir mi resultado' }).click();
+  await expect(page.locator('#reveal-dialog')).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('revelacion.png'), animations: 'disabled' });
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Redes');
   const code = await page.locator('.ticket-code').innerText();
   const whatsapp = await page.getByRole('link', { name: 'Compartir por WhatsApp' }).getAttribute('href');
   expect(whatsapp).toContain('https://wa.me/?text=');
   expect(decodeURIComponent(whatsapp)).toContain('Redes');
   expect(whatsapp).not.toContain(code);
+  const xUrl = new URL(await page.getByRole('link', { name: 'Compartir en X' }).getAttribute('href'));
+  expect(xUrl.hostname).toBe('x.com');
+  expect(xUrl.searchParams.get('text')).toContain('Redes');
+  expect(xUrl.href).not.toContain(code);
+  await page.getByRole('button', { name: 'Copiar enlace', exact: true }).click();
+  expect(await page.evaluate(() => window.copiedText)).toBe('http://127.0.0.1:3107/');
+  await page.getByRole('button', { name: 'Instagram', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByLabel('Tu invitación')).toHaveValue(/Redes/);
+  await page.getByRole('button', { name: 'Copiar invitación' }).click();
+  expect(await page.evaluate(() => window.copiedText)).toContain('Redes');
+  expect(await page.evaluate(() => window.copiedText)).not.toContain(code);
+  await expect(page.getByRole('link', { name: 'Abrir Instagram' })).toHaveAttribute('href', 'https://www.instagram.com/');
+  await page.getByRole('button', { name: 'Cerrar opciones para compartir' }).click();
+  await page.getByRole('button', { name: 'Más opciones' }).click();
+  expect(await page.evaluate(() => window.sharedData.url)).toBe('http://127.0.0.1:3107/');
+  expect(await page.evaluate(() => window.sharedData.text)).not.toContain(code);
+  await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));
+  await page.getByRole('button', { name: 'Más opciones' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined }));
+  await page.getByRole('button', { name: 'Copiar enlace', exact: true }).click();
+  await expect(page.getByLabel('Tu invitación')).toHaveValue('http://127.0.0.1:3107/');
+  await page.getByRole('button', { name: 'Cerrar opciones para compartir' }).click();
   await page.reload();
   await expect(page.locator('.ticket-code')).toHaveText(code);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -45,7 +76,7 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   await admin.getByRole('button', { name: 'Confirmar canje inicial' }).click();
   await expect(admin.locator('#admin-status')).toContainText('Canje inicial registrado');
   await expect(admin.getByRole('button', { name: 'Confirmar canje inicial' })).toHaveCount(0);
-  await admin.getByLabel('Vi el mensaje de WhatsApp').check();
+  await admin.getByLabel('Vi el mensaje o la publicación').check();
   await admin.getByRole('button', { name: 'Confirmar canje extra' }).click();
   await expect(admin.locator('#admin-status')).toContainText('Canje extra registrado');
   await expect(admin.locator('.done')).toHaveCount(2);
@@ -90,4 +121,65 @@ test('320 px, navegación por teclado y almacenamiento dañado', async ({ page }
   await page.keyboard.press('Space');
   await expect(page.getByRole('radio').first()).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('temas persistentes, logos y confirmación de salida conservan el progreso', async ({ page }, testInfo) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('/');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('.brand .logo-dark')).toBeVisible();
+  expect(await page.locator('.brand .logo-dark').evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
+  await expect(page.getByRole('link', { name: 'El centro', exact: true })).toHaveAttribute('href', /frre.utn.edu.ar.*CInApTIC/);
+  await expect(page.locator('.university-link')).toHaveAttribute('href', 'https://www.frre.utn.edu.ar/');
+  const caption = await page.locator('.art-caption').boundingBox();
+  const illustration = await page.locator('.hero-art img').boundingBox();
+  expect(caption.y).toBeGreaterThanOrEqual(illustration.y + illustration.height - 12);
+  await page.screenshot({ path: testInfo.outputPath('inicio-oscuro.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Activar modo claro' }).click();
+  await expect(page.locator('.brand .logo-light')).toBeVisible();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.screenshot({ path: testInfo.outputPath('inicio-claro.png'), fullPage: true });
+  await page.getByRole('link', { name: 'Descubrir mi línea', exact: true }).click();
+  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+  await page.getByLabel('Tu carrera o etapa').selectOption('otra');
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
+  await expect(page.locator('.hat-coach')).toHaveClass(/cheering/);
+  await page.getByRole('radio').nth(1).check();
+  await page.screenshot({ path: testInfo.outputPath('pregunta-claro.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Salir del cuestionario' }).click();
+  await expect(page.getByRole('dialog')).toContainText('¿Seguro que quieres salir del cuestionario?');
+  await expect(page.getByRole('button', { name: '¡Quedarme!' })).toBeFocused();
+  await page.getByRole('button', { name: '¡Quedarme!' }).click();
+  await expect(page.getByRole('radio').nth(1)).toBeChecked();
+  await page.getByRole('button', { name: 'Salir del cuestionario' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('radio').nth(1)).toBeChecked();
+  await page.getByRole('button', { name: 'Activar modo oscuro' }).click();
+  await page.screenshot({ path: testInfo.outputPath('pregunta-oscuro.png'), fullPage: true, animations: 'disabled' });
+  await page.getByRole('button', { name: 'Salir del cuestionario' }).click();
+  await page.screenshot({ path: testInfo.outputPath('confirmar-salida.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Salir', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu curiosidad');
+  await page.getByRole('link', { name: 'Continuar mi descubrimiento', exact: true }).click();
+  await expect(page.getByRole('radio').nth(1)).toBeChecked();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
+test('movimiento reducido y final sin retraso artificial', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/#quiz');
+  await page.getByLabel('Tu carrera o etapa').selectOption('otra');
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  expect(await page.locator('.hat-coach img').evaluate(img => getComputedStyle(img).animationName)).toBe('none');
+  for (let i = 0; i < 6; i++) {
+    await page.getByRole('radio').nth(0).check();
+    if (i < 5) await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  }
+  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '6');
+  await page.getByRole('button', { name: 'Descubrir mi resultado' }).click();
+  await expect(page.locator('.ticket-code')).toBeVisible();
+  await expect(page.locator('.celebration')).toBeHidden();
+  expect(await page.locator('.result-header').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
 });
