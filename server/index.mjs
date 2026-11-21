@@ -77,7 +77,11 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         try { body = JSON.parse(raw); } catch { return json(400, { error: 'JSON inválido.' }); }
         if (!body || typeof body !== 'object' || Array.isArray(body)) return json(400, { error: 'Solicitud inválida.' });
       }
-      const ip = req.socket.remoteAddress;
+      const ip =
+        req.socket?.remoteAddress ||
+        req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+        req.headers['x-real-ip'] ||
+        'vercel';
       const token = req.headers.cookie?.match(/(?:^|;\s*)cinaptic_session=([a-f0-9]{64})(?:;|$)/)?.[1];
       const persistentStore = Boolean(postgresUrl);
       const authenticated = persistentStore || process.env.VERCEL
@@ -125,7 +129,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
     } catch (error) {
       if (!error.status) console.error('Error de solicitud:', error.message);
       if (!res.headersSent) json(error.status || 500, {
-        error: error.status ? error.message : (process.env.VERCEL ? error.message : 'No pudimos completar la operación. Volvé a intentar.'),
+        error: error.status ? error.message : 'No pudimos completar la operación. Volvé a intentar.',
       });
       else res.end();
     }
