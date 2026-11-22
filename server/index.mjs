@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, extname, sep } from 'node:path';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import { createPostgresStore } from './store.mjs';
+import { config } from '../public/content.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(resolve(root, '.env'))) {
@@ -89,6 +90,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         : token && sessions.get(token) > Date.now();
       const cookie = (value, age) => `cinaptic_session=${value}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${age}${secureCookie ? '; Secure' : ''}`;
       if (url.pathname === '/api/participations' && req.method === 'POST') {
+        if (body.eventId !== config.eventId) return json(409, { error: 'Actualizamos el cuestionario. Recargá la página para responder la nueva versión.' });
         // High enough for a shared campus Wi-Fi/NAT; not a one-person identity guarantee.
         limit(`issue:${ip}`, 300, 60000);
         return json(200, await store.issue(body.key, body.career, body.answers));

@@ -27,8 +27,10 @@
 [data-theme="light"] .orbit-tag { background:#e7f0e9; border-color:#b0c6b7; box-shadow:0 6px 20px #183f1510; }
 [data-theme="light"] .tag { color:#3b5143; border-color:#bbd0c1; }
 [data-theme="light"] .line-card .line-icon { background:#e3f0e7; }
-[data-theme="light"] .line-card.agilidad .line-icon { background:#eee4fa; }
-[data-theme="light"] .line-card.datos .line-icon { background:#fff0cf; color:#846017; }
+.line-card.software .line-icon { background:#342e43; color:var(--lavender); }
+.line-card.inteligentes .line-icon { background:#3b3528; color:#f4ce8f; }
+[data-theme="light"] .line-card.software .line-icon { background:#eee4fa; }
+[data-theme="light"] .line-card.inteligentes .line-icon { background:#fff0cf; color:#846017; }
 [data-theme="light"] .button.secondary:hover { background:#e7f0e9; }
 [data-theme="light"] .select-wrap select,[data-theme="light"] input[type="password"],[data-theme="light"] input[type="text"],[data-theme="light"] .select-wrap option { background:#fff; border-color:#a7b9ad; }
 [data-theme="light"] .share-panel { background:#e3f0e7; border-color:#b4cfbd; }

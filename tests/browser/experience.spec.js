@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { config, questions } from '../../public/content.js';
 
 test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async ({ page, browser }, testInfo) => {
   await page.addInitScript(() => {
@@ -12,6 +13,8 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('inicio.png'), fullPage: true });
   await page.getByRole('link', { name: 'Descubrir mi línea', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Ir al inicio', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Salir del cuestionario' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continuar', exact: true })).toBeDisabled();
   await page.getByLabel('Tu carrera o etapa').selectOption('secundaria');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
@@ -33,25 +36,25 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   await expect(page.locator('#reveal-dialog')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(page.locator('#reveal-dialog')).toHaveCSS('border-top-width', '0px');
   await page.screenshot({ path: testInfo.outputPath('revelacion.png'), animations: 'disabled' });
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Redes');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Comunicaciones');
   expect(Date.now() - revealStarted).toBeGreaterThanOrEqual(3400);
   await expect(page.locator('.ticket > p')).toHaveText('Mostrá este código en el stand del CInApTIC y canjealo por un dulce premio');
   const code = await page.locator('.ticket-code').innerText();
   const whatsapp = await page.getByRole('link', { name: 'Compartir por WhatsApp' }).getAttribute('href');
   expect(whatsapp).toContain('https://wa.me/?text=');
-  expect(decodeURIComponent(whatsapp)).toContain('Redes');
+  expect(decodeURIComponent(whatsapp)).toContain('Comunicaciones');
   expect(whatsapp).not.toContain(code);
   const xUrl = new URL(await page.getByRole('link', { name: 'Compartir en X' }).getAttribute('href'));
   expect(xUrl.hostname).toBe('x.com');
-  expect(xUrl.searchParams.get('text')).toContain('Redes');
+  expect(xUrl.searchParams.get('text')).toContain('Comunicaciones');
   expect(xUrl.href).not.toContain(code);
   await page.getByRole('button', { name: 'Copiar enlace', exact: true }).click();
   expect(await page.evaluate(() => window.copiedText)).toBe('http://127.0.0.1:3107/');
   await page.getByRole('button', { name: 'Instagram', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByLabel('Tu invitación')).toHaveValue(/Redes/);
+  await expect(page.getByLabel('Tu invitación')).toHaveValue(/Comunicaciones/);
   await page.getByRole('button', { name: 'Copiar invitación' }).click();
-  expect(await page.evaluate(() => window.copiedText)).toContain('Redes');
+  expect(await page.evaluate(() => window.copiedText)).toContain('Comunicaciones');
   expect(await page.evaluate(() => window.copiedText)).not.toContain(code);
   await expect(page.getByRole('link', { name: 'Abrir Instagram' })).toHaveAttribute('href', 'https://www.instagram.com/');
   await page.getByRole('button', { name: 'Cerrar opciones para compartir' }).click();
@@ -119,7 +122,7 @@ test('fallo de red al terminar permite reintentar sin perder las respuestas', as
 test('320 px, navegación por teclado y almacenamiento dañado', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await page.goto('/');
-  await page.evaluate(() => localStorage.setItem('cinaptic:noche-universidades-2026:v1', '{invalid-json'));
+  await page.evaluate(() => localStorage.setItem('cinaptic:noche-universidades-2026-v2:v1', '{invalid-json'));
   await page.reload();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.goto('/#quiz');
@@ -192,4 +195,44 @@ test('movimiento reducido mantiene el tiempo de lectura sin animación', async (
   expect(Date.now() - revealStarted).toBeGreaterThanOrEqual(3400);
   await expect(page.locator('.celebration')).toBeHidden();
   expect(await page.locator('.result-header').evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+});
+
+for (const [id, name, projectText] of [
+  ['software', 'Ingeniería de Software', 'gobierno y calidad de datos'],
+  ['inteligentes', 'Sistemas Inteligentes', 'semillas de algodón'],
+]) {
+  test(`el resultado de ${name} muestra los proyectos actuales`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 320, height: 760 });
+    await page.goto('/#quiz');
+    await page.getByLabel('Tu carrera o etapa').selectOption('otra');
+    await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+    for (let i = 0; i < questions.length; i++) {
+      await page.getByRole('radio').nth(questions[i].options.findIndex(option => option.line === id)).check();
+      await page.getByRole('button', { name: i === questions.length - 1 ? 'Descubrir mi resultado' : 'Continuar', exact: true }).click();
+    }
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+    await expect(page.locator('.result-project')).toContainText(projectText);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`resultado-${id}.png`), fullPage: true, animations: 'disabled' });
+  });
+}
+
+test('el progreso viejo de prueba no se interpreta con las preguntas nuevas', async ({ page }) => {
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.setItem('cinaptic:noche-universidades-2026:v1', JSON.stringify({
+      key: 'a'.repeat(64), career: 'sistemas', step: 6, answers: [0,0,0,0,0,0],
+      ticket: { code: 'CN-AAAAA-BBBBB', answers: [0,0,0,0,0,0] },
+    }));
+  });
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Descubrir mi línea', exact: true })).toBeVisible();
+  for (const name of ['Comunicaciones', 'Ingeniería de Software', 'Sistemas Inteligentes']) {
+    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+  }
+  await page.getByRole('link', { name: 'Descubrir mi línea', exact: true }).click();
+  await expect(page.getByLabel('Tu carrera o etapa')).toHaveValue('');
+  const stored = await page.evaluate(eventId => JSON.parse(localStorage.getItem(`cinaptic:${eventId}:v1`)), config.eventId);
+  expect(stored.ticket).toBeNull();
+  expect(stored.key).not.toBe('a'.repeat(64));
 });

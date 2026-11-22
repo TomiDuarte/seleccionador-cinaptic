@@ -8,6 +8,7 @@ const paths = {
   network: '<circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="m10 8-4 8m8-8 4 8M8 19h8"/>',
   spark: '<path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/>',
   database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
+  intelligence: '<rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 2v4m6-4v4M9 18v4m6-4v4M2 9h4m-4 6h4m12-6h4m-4 6h4M10 10h4v4h-4Z"/>',
   gift: '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M5 13v8h14v-8M12 8v13M12 8C3 9 5 0 9 3l3 5Zm0 0c9 1 7-8 3-5l-3 5Z"/>',
   chat: '<path d="M21 11a9 9 0 0 1-9 9c-2 0-3-.3-5-1l-5 2 2-5a9 9 0 1 1 17-5Z"/><path d="M8 11h8M8 7h5M8 15h5"/>',
 };
@@ -36,7 +37,7 @@ function renderHome() {
       <p>Ponete el sombrero de la investigación y descubrí qué línea del CInApTIC conecta con vos.</p>
       <a class="button" href="#${state.ticket ? 'resultado' : 'quiz'}">${icon('spark')}${action}</a>
       <p class="micro">Unos 2 minutos · Sin respuestas incorrectas · Con premio</p></div>
-      <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad."><span class="orbit-tag t1">&lt;/&gt; Agilidad</span><span class="orbit-tag t2">⌁ Redes</span><span class="orbit-tag t3">▤ Base de Datos</span><span class="art-caption">Tu próxima gran idea empieza con curiosidad.</span></div>
+      <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad.">${lines.map((line, i) => `<span class="orbit-tag t${i + 1}">${line.name}</span>`).join('')}<span class="art-caption">Tu próxima gran idea empieza con curiosidad.</span></div>
     </section>
     <section class="journey" aria-label="Cómo participar">
       <div class="journey-item">${icon('chat')}<div><strong>Contanos qué te mueve</strong><p>Tu carrera y 6 preguntas cortitas.</p></div></div>
@@ -104,7 +105,7 @@ function renderQuiz(previousStep = state.step) {
     document.querySelector('[role="progressbar"]').setAttribute('aria-valuetext', 'Todas las etapas completadas');
     try {
       const [ticket] = await Promise.all([
-        api('/api/participations', { method: 'POST', body: JSON.stringify({ key: state.key, career: state.career, answers: state.answers }) }),
+        api('/api/participations', { method: 'POST', body: JSON.stringify({ eventId: config.eventId, key: state.key, career: state.career, answers: state.answers }) }),
         new Promise(resolve => setTimeout(resolve, 3500)),
       ]);
       state.ticket = ticket; persist();

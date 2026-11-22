@@ -1,7 +1,10 @@
+import './helpers/isolate-env.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
+import { DatabaseSync } from 'node:sqlite';
+import { config } from '../public/content.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, basename, sep } from 'node:path';
@@ -17,7 +20,7 @@ async function withApp(t) {
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const request = (path, body, cookie, headers = {}) => fetch(base + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const request = (path, body, cookie, headers = {}) => fetch(base + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(path === '/api/participations' ? { eventId: config.eventId, ...body } : body) }) });
   const login = async () => { const res = await request('/api/admin/login', { password }); assert.equal(res.status, 200); return res.headers.get('set-cookie').split(';')[0]; };
   return { request, login };
 }
@@ -66,6 +69,41 @@ test('limita intentos de contraseña incorrecta', async t => {
   const { request } = await withApp(t);
   for (let i = 0; i < 10; i++) assert.equal((await request('/api/admin/login', { password: 'no' })).status, 401);
   assert.equal((await request('/api/admin/login', { password: 'no' })).status, 429);
+});
+
+test('rechaza respuestas enviadas desde una versión anterior del cuestionario', async t => {
+  const { request } = await withApp(t);
+  for (const eventId of ['noche-universidades-2026', null]) {
+    const response = await request('/api/participations', { eventId, key: key(), career: 'otra', answers });
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).error, /Recargá la página/);
+  }
+});
+
+test('la nueva edición deja los códigos de prueba anteriores fuera del panel', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'cinaptic-test-'));
+  const filename = join(folder, 'edition.sqlite');
+  const store = createStore(filename);
+  let db;
+  try {
+    db = new DatabaseSync(filename);
+    const participant = key();
+    const oldCode = 'CN-AAAAA-BBBBB';
+    db.prepare('INSERT INTO participations (event,token_hash,code,career,answers,created_at) VALUES (?,?,?,?,?,?)')
+      .run('noche-universidades-2026', createHash('sha256').update(participant).digest('hex'), oldCode, 'otra', JSON.stringify(answers), new Date().toISOString());
+    assert.equal(store.own(participant), null);
+    assert.equal(store.lookup(oldCode), null);
+    assert.equal(store.stats().participants, 0);
+    const current = store.issue(participant, 'otra', answers);
+    assert.notEqual(current.code, oldCode);
+    assert.equal(store.stats().participants, 1);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM participations').get().n, 2);
+  } finally {
+    db?.close(); store.close();
+    const target = resolve(folder);
+    assert.ok(target.startsWith(resolve(tmpdir()) + sep) && basename(target).startsWith('cinaptic-test-'));
+    rmSync(target, { recursive: true, force: true });
+  }
 });
 test('el código y los canjes sobreviven a reiniciar la base', () => {
   const folder = mkdtempSync(join(tmpdir(), 'cinaptic-test-'));

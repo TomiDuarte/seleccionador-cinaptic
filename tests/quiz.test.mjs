@@ -3,6 +3,13 @@ import assert from 'node:assert/strict';
 import { calculateResult, validAnswers, validCareer } from '../public/quiz.js';
 import { lines, questions } from '../public/content.js';
 
+test('cada pregunta representa las tres líneas actuales exactamente una vez', () => {
+  assert.deepEqual(lines.map(line => line.name).sort(), ['Comunicaciones', 'Ingeniería de Software', 'Sistemas Inteligentes'].sort());
+  for (const question of questions) {
+    assert.deepEqual(question.options.map(option => option.line).sort(), lines.map(line => line.id).sort());
+  }
+});
+
 test('cada línea puede ganar con las seis respuestas afines', () => {
   for (const line of lines) {
     const answers = questions.map(q => q.options.findIndex(o => o.line === line.id));
