@@ -125,6 +125,7 @@ body[data-view="quiz"] .header-pill { display:none; }
 }
 @media(max-width:360px) { .brand-logo { width:140px; } .site-header nav { gap:8px; } .site-header { padding-inline:16px; } }
 .result-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:14px; margin-top:24px; }
+.quiz-actions #next:only-child { margin-left:auto; }
 .home-button { box-shadow:0 4px 0 #43835a; }
 .home-button:active { transform:translateY(3px); box-shadow:0 1px 0 #43835a; }
 @media(max-width:600px) { .result-actions { flex-direction:column; } .result-actions .button { width:100%; } }

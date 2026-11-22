@@ -77,7 +77,7 @@ function renderQuiz(previousStep = state.step) {
     <span class="eyebrow">${step ? 'Seguí tu curiosidad' : 'Primero, nos conocemos'}</span>
     <h1>${step ? question.title : '¿Qué estás estudiando?'}</h1><p class="question-subtitle">${step ? question.subtitle : 'Todas las curiosidades tienen lugar. Contanos desde dónde venís.'}</p>
     <form id="quiz-form">${step ? `<fieldset class="options"><legend class="sr-only">${question.title}</legend>${question.options.map((option, i) => `<label class="option"><input type="radio" name="answer" value="${i}" ${state.answers[step - 1] === i ? 'checked' : ''} required><span>${option.text}</span></label>`).join('')}</fieldset>` : `<label class="field-label" for="career">Tu carrera o etapa</label><div class="select-wrap"><select name="career" id="career" required><option value="">Elegí una opción</option>${careers.map(([id, name]) => `<option value="${id}" ${state.career === id ? 'selected' : ''}>${name}</option>`).join('')}</select></div><p class="career-note">${icon('spark')} No necesitás experiencia en investigación. Tu carrera no determina tu resultado.</p>`}
-    <div id="quiz-error" class="error" role="alert"></div><div class="quiz-actions"><button class="text-button" type="button" id="back">${step ? 'Volver' : 'Ir al inicio'}</button><button class="button" type="submit" id="next" ${step ? state.answers[step - 1] === null ? 'disabled' : '' : !state.career ? 'disabled' : ''}>${step === questions.length ? 'Descubrir mi resultado' : 'Continuar'}</button></div></form>
+    <div id="quiz-error" class="error" role="alert"></div><div class="quiz-actions">${step ? '<button class="text-button" type="button" id="back">Volver</button>' : ''}<button class="button" type="submit" id="next" ${step ? state.answers[step - 1] === null ? 'disabled' : '' : !state.career ? 'disabled' : ''}>${step === questions.length ? 'Descubrir mi resultado' : 'Continuar'}</button></div></form>
     </div></section>`;
   if (previousStep !== step && !reducedMotion()) {
     document.querySelector('.progress-fill').animate([{ width: `${previousStep / 7 * 100}%` }, { width: `${step / 7 * 100}%` }], { duration: 450, easing: 'ease-out' });
@@ -88,7 +88,7 @@ function renderQuiz(previousStep = state.step) {
     else state.answers[step - 1] = Number(event.target.value);
     document.querySelector('#next').disabled = false; persist();
   });
-  document.querySelector('#back').onclick = () => { if (step) { state.step--; persist(); renderQuiz(step); focusHeading(); } else confirmExit(); };
+  document.querySelector('#back')?.addEventListener('click', () => { state.step--; persist(); renderQuiz(step); focusHeading(); });
   document.querySelector('#quiz-form').onsubmit = async event => {
     event.preventDefault();
     if (submitting || (!step && !validCareer(state.career))) return;
