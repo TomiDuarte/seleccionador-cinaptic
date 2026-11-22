@@ -38,17 +38,14 @@ function renderHome() {
       <p>Ponete el sombrero de la investigación y descubrí qué línea del CInApTIC conecta con vos.</p>
       <a class="button" href="#${state.ticket ? 'resultado' : 'quiz'}">${icon('spark')}${action}</a>
       ${state.ticket ? `<button class="button secondary retake-button" type="button" id="retake-quiz">${state.retaking ? 'Continuar el quiz' : 'Volver a responder el quiz'}</button><p class="micro">Conservás tu código y los premios ya canjeados.</p>` : '<p class="micro">Unos 2 minutos · Sin respuestas incorrectas · Con premio</p>'}</div>
-      <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad.">${lines.map((line, i) => `<span class="orbit-tag t${i + 1}">${line.name}</span>`).join('')}<span class="art-caption">Tu próxima gran idea empieza con curiosidad.</span></div>
+      <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad.">${(state.ticket ? lines.map(line => line.name) : ['Tu curiosidad', 'Tus ideas', 'Tu próximo descubrimiento']).map((label, i) => `<span class="orbit-tag t${i + 1}">${label}</span>`).join('')}<span class="art-caption">Tu próxima gran idea empieza con curiosidad.</span></div>
     </section>
     <section class="journey" aria-label="Cómo participar">
       <div class="journey-item">${icon('chat')}<div><strong>Contanos qué te mueve</strong><p>Tu carrera y 6 preguntas cortitas.</p></div></div>
       <div class="journey-item">${icon('spark')}<div><strong>Encontrá tu conexión</strong><p>Una línea para empezar a explorar.</p></div></div>
       <div class="journey-item">${icon('gift')}<div><strong>Llevate algo dulce</strong><p>Mostrá tu código en el stand.</p></div></div>
     </section>
-    <section class="lines-section" id="lineas" aria-labelledby="lines-title"><div class="section-intro"><h2 id="lines-title">¿Y si tu próxima idea<br>empieza acá?</h2></div>
-      <div class="line-grid">${lines.map(line => `<article class="line-card ${line.id}"><div class="line-icon">${icon(line.icon)}</div><h3>${line.name}</h3><p class="tagline">${line.label}</p><p class="description">${line.description}</p><div class="tags">${line.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div><details><summary>Una idea para investigar</summary><p>${line.challenge}</p><p>${line.project}</p></details></article>`).join('')}</div>
-      <p class="about-note"><a href="${config.officialUrl}" target="_blank" rel="noopener noreferrer">Ver proyectos en la web oficial</a></p>
-    </section>
+    ${renderLines()}
     <section class="invitation"><div><h2>No necesitás tener todas las respuestas.</h2><p>Traé tus preguntas. Acercate al stand, conocé al equipo y conversemos sobre cómo podrías participar.</p></div><a class="button" href="#quiz">Me sumo a explorar</a></section>
     <section class="faq"><h2>Antes de ponerte el sombrero…</h2>
       <details><summary>¿Tengo que estudiar Sistemas para participar?</summary><p>No. El juego está abierto a todas las carreras y a quienes todavía están eligiendo. Tu carrera no limita el resultado. En el stand podés consultar las posibilidades de participación en el centro.</p></details>
@@ -65,6 +62,36 @@ function renderHome() {
     }
     location.hash = 'quiz';
   });
+  animateDiscoveries();
+}
+
+function renderLines() {
+  if (!state.ticket) return `<section class="lines-section discovery-locked" id="lineas" aria-labelledby="lines-title">
+    <div class="mystery-orbit" aria-hidden="true"><span>✦</span><span>?</span><span>✧</span></div>
+    <div><span class="eyebrow">Primero, seguí tu intuición</span><h2 id="lines-title">Hay tres caminos.<br>El tuyo empieza con vos.</h2><p>Respondé el quiz y después descubrí las tres líneas de investigación. Dejemos que tu curiosidad hable primero.</p><a class="button secondary" href="#quiz">${state.career ? 'Continuar el cuestionario' : 'Empezar el cuestionario'}</a></div>
+  </section>`;
+  return `<section class="lines-section discovery-unlocked" id="lineas" aria-labelledby="lines-title">
+    <div class="section-intro"><div><span class="eyebrow">Tu curiosidad abrió estas puertas</span><h2 id="lines-title">Tres caminos.<br>Un mundo por descubrir.</h2></div><p>Ya conocés tu conexión. Ahora acercate a cada línea y descubrí dónde podrían crecer tus ideas.</p></div>
+    <div class="discovery-trail">${lines.map(line => `<article class="line-card discovery-card ${line.id}">
+      <div class="line-universe" aria-hidden="true"><div class="universe-ring"></div><div class="line-icon">${icon(line.icon)}</div><span class="universe-spark">✦</span><span class="universe-moon"></span></div>
+      <div class="line-story">${state.ticket.result.topIds.includes(line.id) ? '<span class="connection-label">Tu conexión con el sombrero</span>' : ''}<h3>${line.name}</h3><p class="tagline">${line.label}</p><p class="description">${line.description}</p><div class="tags">${line.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}</div><details><summary>Una idea para investigar</summary><p>${line.challenge}</p><p>${line.project}</p></details></div>
+    </article>`).join('')}</div>
+    <p class="about-note"><a href="${config.officialUrl}" target="_blank" rel="noopener noreferrer">Ver proyectos en la web oficial</a></p>
+  </section>`;
+}
+
+let discoveryObserver;
+function animateDiscoveries() {
+  if (reducedMotion() || !('IntersectionObserver' in window)) return;
+  discoveryObserver = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      entry.target.animate([{ opacity: .3, transform: 'translateY(26px)' }, { opacity: 1, transform: 'translateY(0)' }], { duration: 650, easing: 'cubic-bezier(.22,.8,.35,1)' });
+      entry.target.classList.add('discovered');
+      discoveryObserver.unobserve(entry.target);
+    }
+  }, { threshold: .12 });
+  main.querySelectorAll('.discovery-card, .discovery-locked, .journey-item').forEach(element => discoveryObserver.observe(element));
 }
 
 const encouragement = [
@@ -248,11 +275,12 @@ document.addEventListener('click', event => {
 });
 
 function route() {
+  discoveryObserver?.disconnect();
   document.body.dataset.view = location.hash === '#quiz' ? 'quiz' : location.hash === '#resultado' ? 'result' : 'home';
   if (location.hash !== '#quiz') document.querySelector('#reveal-dialog').close();
   if (location.hash === '#quiz') renderQuiz();
   else if (location.hash === '#resultado') { renderResult(); void syncTicket(); }
-  else { renderHome(); if (location.hash === '#lineas') { document.querySelector('#lineas').scrollIntoView(); return; } }
+  else { renderHome(); if (location.hash === '#lineas') { const heading = document.querySelector('#lines-title'); heading.tabIndex = -1; heading.focus({ preventScroll: true }); document.querySelector('#lineas').scrollIntoView(); return; } }
   focusHeading();
 }
 window.addEventListener('hashchange', route);

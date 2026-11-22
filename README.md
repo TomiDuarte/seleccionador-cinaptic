@@ -23,7 +23,7 @@ Para probar desde un teléfono, conectarlo al mismo Wi-Fi y abrir `http://IP-LOC
 
 ## Experiencia incluida
 
-1. Presentación del centro y sus tres líneas actuales: Comunicaciones, Ingeniería de Software y Sistemas Inteligentes.
+1. Inicio sin nombres ni explicaciones de las líneas para invitar a responder desde la curiosidad. Después de completar el quiz se habilitan Comunicaciones, Ingeniería de Software y Sistemas Inteligentes, con proyectos desplegables, formas orgánicas y animaciones al entrar en pantalla. El resultado enlaza a esa sección y destaca la afinidad encontrada. El acceso permanece disponible al recargar o repetir el quiz; entrar a `#lineas` sin haber terminado muestra la invitación a responder.
 2. Selección de carrera, con opciones para secundaria y personas que aún están explorando.
 3. Seis preguntas situacionales. Cada elección suma un punto a una línea; la carrera no condiciona el resultado.
 4. Resultado explicado, distribución de elecciones y empates explícitos. Es una actividad de divulgación, no un instrumento vocacional validado.

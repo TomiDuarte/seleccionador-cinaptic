@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
-import { config, questions } from '../../public/content.js';
+import { config, questions, lines } from '../../public/content.js';
 
 test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async ({ page, browser }, testInfo) => {
   await page.addInitScript(() => {
@@ -230,13 +230,68 @@ test('el progreso viejo de prueba no se interpreta con las preguntas nuevas', as
   await page.reload();
   await expect(page.getByRole('link', { name: 'Descubrir mi línea', exact: true })).toBeVisible();
   for (const name of ['Comunicaciones', 'Ingeniería de Software', 'Sistemas Inteligentes']) {
-    await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name, exact: true })).toHaveCount(0);
   }
   await page.getByRole('link', { name: 'Descubrir mi línea', exact: true }).click();
   await expect(page.getByLabel('Tu carrera o etapa')).toHaveValue('');
   const stored = await page.evaluate(eventId => JSON.parse(localStorage.getItem(`cinaptic:${eventId}:v1`)), config.eventId);
   expect(stored.ticket).toBeNull();
   expect(stored.key).not.toBe('a'.repeat(64));
+});
+
+test('las líneas se descubren después del quiz y permanecen disponibles al volver', async ({ page }, testInfo) => {
+  await page.goto('/#lineas');
+  await expect(page.locator('.discovery-locked')).toBeVisible();
+  await expect(page.locator('.line-card')).toHaveCount(0);
+  for (const line of lines) {
+    await expect(page.locator('main')).not.toContainText(line.name);
+    await expect(page.locator('main')).not.toContainText(line.description);
+  }
+  await page.getByRole('link', { name: 'Empezar el cuestionario', exact: true }).click();
+  await page.getByLabel('Tu carrera o etapa').selectOption('otra');
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await page.getByRole('radio').first().check();
+  await page.getByRole('button', { name: 'Salir del cuestionario' }).click();
+  await page.getByRole('button', { name: 'Salir', exact: true }).click();
+  await expect(page.locator('.line-card')).toHaveCount(0);
+  await page.getByRole('link', { name: 'Continuar el cuestionario', exact: true }).click();
+  for (let i = 0; i < questions.length; i++) {
+    await page.getByRole('radio').nth(questions[i].options.findIndex(option => option.line === 'software')).check();
+    await page.getByRole('button', { name: i === questions.length - 1 ? 'Descubrir mi resultado' : 'Continuar', exact: true }).click();
+  }
+  await expect(page.locator('.ticket-code')).toBeVisible();
+  await page.getByRole('link', { name: 'Conocer las tres líneas', exact: true }).click();
+  await expect(page.locator('#lines-title')).toBeFocused();
+  await expect(page.locator('.discovery-locked')).toHaveCount(0);
+  await expect(page.locator('.discovery-card')).toHaveCount(3);
+  await expect(page.locator('.software .connection-label')).toHaveText('Tu conexión con el sombrero');
+  await expect(page.locator('.connection-label')).toHaveCount(1);
+  for (const line of lines) {
+    const card = page.locator(`.discovery-card.${line.id}`);
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toHaveClass(/discovered/);
+    await expect(card).toContainText(line.description);
+    await card.getByText('Una idea para investigar', { exact: true }).click();
+    await expect(card.locator('details')).toContainText(line.project);
+    await expect(card.locator('details')).toHaveAttribute('open', '');
+  }
+  await expect(page.getByRole('link', { name: 'Ver proyectos en la web oficial' })).toHaveAttribute('href', config.officialUrl);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator('#lineas').screenshot({ path: testInfo.outputPath('lineas-claro.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Activar modo oscuro' }).click();
+  await page.locator('#lineas').screenshot({ path: testInfo.outputPath('lineas-oscuro.png'), animations: 'disabled' });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload();
+  await expect(page.locator('.discovery-card')).toHaveCount(3);
+  expect(await page.locator('.universe-ring').first().evaluate(el => getComputedStyle(el).animationName)).toBe('none');
+  await page.setViewportSize({ width: 320, height: 760 });
+  for (const summary of await page.locator('.discovery-card summary').all()) await summary.click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator('#lineas').screenshot({ path: testInfo.outputPath('lineas-320.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Volver a responder el quiz' }).click();
+  await page.getByRole('button', { name: 'Salir del cuestionario' }).click();
+  await page.getByRole('button', { name: 'Salir', exact: true }).click();
+  await expect(page.locator('.discovery-card')).toHaveCount(3);
 });
 
 test('repetir desde el inicio conserva código y canjes, incluso al salir y recargar', async ({ page, request }, testInfo) => {

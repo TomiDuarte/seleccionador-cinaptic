@@ -18,10 +18,78 @@
 .hero-copy .retake-button { display:flex; width:fit-content; margin-top:14px; }
 @media(max-width:600px) { .hero-copy .retake-button { width:100%; } }
 .section-intro h2 { margin-top:0; }
+/* A discovery trail: revealed only after the visitor's first result. */
+.discovery-locked { display:grid; grid-template-columns:230px 1fr; align-items:center; gap:42px; padding-block:12px 72px; }
+.discovery-locked h2,.discovery-unlocked h2 { margin-top:12px; }
+.discovery-locked p { max-width:530px; margin:20px 0 24px; }
+.mystery-orbit { width:210px; aspect-ratio:1; position:relative; display:grid; place-items:center; border:1px dashed var(--lavender); border-radius:46% 54% 61% 39% / 52% 36% 64% 48%; background:radial-gradient(ellipse,var(--selected),transparent 70%); }
+.mystery-orbit::before { content:''; position:absolute; inset:20px -12px; border:1px solid var(--border); border-radius:50%; transform:rotate(-28deg); }
+.mystery-orbit span:nth-child(2) { font:italic 6rem Georgia,serif; color:var(--lavender); }
+.mystery-orbit span:first-child,.mystery-orbit span:last-child { position:absolute; font-size:2.2rem; color:var(--mint); }
+.mystery-orbit span:first-child { top:10px; left:8px; }
+.mystery-orbit span:last-child { bottom:8px; right:4px; }
+.discovery-unlocked .section-intro { margin-bottom:42px; }
+.discovery-unlocked .section-intro>p { font-size:1rem; }
+.discovery-trail { display:grid; gap:32px; position:relative; }
+.discovery-trail::before { content:''; position:absolute; inset:40px 50% 40px 11%; border-left:1px dashed var(--border); border-radius:50%; pointer-events:none; }
+.discovery-card { --line-accent:var(--mint); --line-tint:var(--surface-soft); position:relative; display:grid; grid-template-columns:190px minmax(0,1fr); align-items:center; gap:36px; padding:40px 46px; margin-right:70px; border:1px solid var(--border); border-radius:70px 28px 70px 28px; background:radial-gradient(ellipse at 0% 0%,var(--line-tint),transparent 65%),var(--surface); transition:border-color .25s,box-shadow .25s; }
+.discovery-card.software { --line-accent:var(--lavender); --line-tint:var(--selected); margin-right:0; margin-left:70px; border-radius:28px 70px 28px 70px; }
+.discovery-card.inteligentes { --line-accent:#f4ce8f; --line-tint:#3b3528; }
+[data-theme="light"] .discovery-card.inteligentes { --line-accent:#846017; --line-tint:#fff0cf; }
+.line-universe { position:relative; width:180px; aspect-ratio:1; display:grid; place-items:center; color:var(--line-accent); }
+.universe-ring { position:absolute; inset:3%; border:1px solid currentColor; opacity:.4; border-radius:43% 57% 55% 45% / 40% 41% 59% 60%; transform:rotate(-20deg); }
+.universe-ring::after { content:''; position:absolute; inset:16px -9px; border:1px dashed currentColor; border-radius:50%; transform:rotate(50deg); }
+.discovery-card .line-icon { margin:0; width:96px; height:96px; border-radius:38% 62% 58% 42% / 46% 42% 58% 54%; transform:rotate(-8deg); }
+.discovery-card .line-icon .icon { width:44px; height:44px; transform:rotate(8deg); }
+.universe-spark { position:absolute; top:2px; right:12px; font-size:2rem; }
+.universe-moon { position:absolute; left:9px; bottom:26px; width:15px; height:15px; border:3px solid currentColor; border-radius:50%; background:var(--surface); }
+.discovery-card.discovered .universe-ring { animation:discovery-orbit 9s ease-in-out 2; }
+.discovery-card.discovered .universe-spark { animation:discovery-spark 3s ease-in-out 3; }
+.line-story { min-width:0; }
+.discovery-card h3 { font-size:clamp(1.65rem,3vw,2.25rem); margin-bottom:10px; }
+.discovery-card .tagline { font-size:1rem; color:var(--line-accent); }
+.discovery-card .description,.discovery-card details p { font-size:1rem; }
+.discovery-card .tag { border-radius:99px; font-size:.875rem; padding:5px 12px; }
+.discovery-card details { margin-top:22px; padding-top:12px; }
+.discovery-card summary { font-size:1rem; min-height:44px; align-content:center; }
+.connection-label { display:inline-block; color:var(--line-accent); border-bottom:1px solid currentColor; font-size:.875rem; margin-bottom:18px; padding-bottom:4px; }
+.discovery-unlocked .about-note { text-align:center; max-width:none; margin-top:32px; font-size:.9rem; }
+.invitation { border-radius:38px 16px 38px 16px; }
+.hero-art .orbit-tag { animation:tag-arrive .7s ease-out both; }
+.hero-art .t2 { animation-delay:.12s; }
+.hero-art .t3 { animation-delay:.24s; }
+@media(hover:hover) { .discovery-card:hover { border-color:var(--line-accent); box-shadow:0 12px 36px #00000012; } .journey-item:hover .icon { transform:rotate(-10deg) scale(1.12); } }
+.journey-item .icon { transition:transform .25s; }
+@keyframes discovery-orbit { 50% { transform:rotate(35deg); } }
+@keyframes discovery-spark { 50% { transform:translateY(-9px) rotate(35deg); } }
+@keyframes tag-arrive { from { opacity:0; translate:0 12px; } to { opacity:1; translate:0 0; } }
+@media(max-width:800px) {
+  .discovery-card { grid-template-columns:130px minmax(0,1fr); gap:24px; padding:32px; margin-right:24px; }
+  .discovery-card.software { margin-left:24px; }
+  .line-universe { width:130px; }
+  .discovery-card .line-icon { width:76px; height:76px; }
+  .discovery-locked { grid-template-columns:170px 1fr; gap:28px; }
+  .mystery-orbit { width:155px; }
+}
+@media(max-width:600px) {
+  .discovery-locked { grid-template-columns:1fr; gap:26px; padding-bottom:48px; }
+  .mystery-orbit { width:155px; margin:auto; }
+  .mystery-orbit span:nth-child(2) { font-size:4.5rem; }
+  .discovery-locked h2 { font-size:2rem; }
+  .discovery-locked .button { width:100%; }
+  .discovery-card,.discovery-card.software { grid-template-columns:1fr; gap:18px; margin:0; padding:28px 24px; border-radius:48px 20px 48px 20px; }
+  .discovery-card.software { border-radius:20px 48px 20px 48px; }
+  .line-universe { width:120px; margin:auto; }
+  .discovery-card .line-icon { margin:0; width:68px; height:68px; }
+  .discovery-card .line-icon .icon { width:34px; height:34px; }
+  .discovery-card h3 { font-size:1.8rem; overflow-wrap:anywhere; }
+  .discovery-trail { gap:24px; }
+  .discovery-trail::before { left:50%; }
+}
 .button { background:var(--accent-button); }
 .button.mint { background:#a8e5c0; }
 .invitation { background:var(--accent-button); }
-.line-card,.result-panel,.admin-card,.option { background:var(--surface); }
+.line-card:not(.discovery-card),.result-panel,.admin-card,.option { background:var(--surface); }
 .option:has(input:checked) { background:var(--selected); }
 .option { transition:border-color .15s; }
 .career-note,.stat { background:var(--surface-soft); }
