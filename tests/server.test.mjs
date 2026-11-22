@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { randomBytes, createHash } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { config } from '../public/content.js';
+import { config, questions } from '../public/content.js';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, basename, sep } from 'node:path';
@@ -20,7 +20,7 @@ async function withApp(t) {
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const request = (path, body, cookie, headers = {}) => fetch(base + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(path === '/api/participations' ? { eventId: config.eventId, ...body } : body) }) });
+  const request = (path, body, cookie, headers = {}) => fetch(base + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(path.startsWith('/api/participations') ? { eventId: config.eventId, ...body } : body) }) });
   const login = async () => { const res = await request('/api/admin/login', { password }); assert.equal(res.status, 200); return res.headers.get('set-cookie').split(';')[0]; };
   return { request, login };
 }
@@ -69,6 +69,48 @@ test('limita intentos de contraseña incorrecta', async t => {
   const { request } = await withApp(t);
   for (let i = 0; i < 10; i++) assert.equal((await request('/api/admin/login', { password: 'no' })).status, 401);
   assert.equal((await request('/api/admin/login', { password: 'no' })).status, 429);
+});
+
+test('repetir actualiza el resultado sin duplicar el código ni reactivar premios', async t => {
+  const { request, login } = await withApp(t);
+  const participant = key();
+  const initial = await (await request('/api/participations', { key: participant, career: 'sistemas', answers })).json();
+  const newAnswers = questions.map(q => q.options.findIndex(option => option.line === 'software'));
+  const repeatBody = { key: participant, career: 'otra', answers: newAnswers };
+  const firstRepeat = await (await request('/api/participations/retake', repeatBody)).json();
+  assert.equal(firstRepeat.code, initial.code);
+  assert.equal(firstRepeat.baseAt, null);
+  assert.deepEqual(firstRepeat.result.topIds, ['software']);
+  const cookie = await login();
+  await request('/api/admin/redeem', { code: initial.code, kind: 'base' }, cookie);
+  const redeemed = await (await request('/api/admin/redeem', { code: initial.code, kind: 'bonus', confirmed: true }, cookie)).json();
+  const parallel = await Promise.all([1, 2].map(() => request('/api/participations/retake', repeatBody)));
+  for (const response of parallel) {
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.code, initial.code);
+    assert.equal(result.createdAt, initial.createdAt);
+    assert.equal(result.baseAt, redeemed.baseAt);
+    assert.equal(result.bonusAt, redeemed.bonusAt);
+    assert.equal(result.career, 'otra');
+    assert.deepEqual(result.result.topIds, ['software']);
+  }
+  assert.equal((await request('/api/admin/redeem', { code: initial.code, kind: 'base' }, cookie)).status, 409);
+  assert.equal((await request('/api/admin/redeem', { code: initial.code, kind: 'bonus', confirmed: true }, cookie)).status, 409);
+  assert.deepEqual(await (await request('/api/admin/stats', undefined, cookie)).json(), { participants: 1, redeemed: 1, extras: 1 });
+  const own = await (await request('/api/participation', undefined, null, { Authorization: `Bearer ${participant}` })).json();
+  assert.deepEqual(own.answers, newAnswers);
+});
+
+test('repetir no emite códigos para claves desconocidas ni acepta datos inválidos', async t => {
+  const { request, login } = await withApp(t);
+  const valid = { key: key(), career: 'otra', answers };
+  assert.equal((await request('/api/participations/retake', valid)).status, 404);
+  assert.equal((await request('/api/participations/retake', { ...valid, key: 'invalid' })).status, 400);
+  assert.equal((await request('/api/participations/retake', { ...valid, answers: [] })).status, 400);
+  assert.equal((await request('/api/participations/retake', { ...valid, eventId: 'old' })).status, 409);
+  const cookie = await login();
+  assert.equal((await (await request('/api/admin/stats', undefined, cookie)).json()).participants, 0);
 });
 
 test('rechaza respuestas enviadas desde una versión anterior del cuestionario', async t => {
@@ -131,6 +173,16 @@ test('el almacén temporal emite, consulta y canjea participaciones', () => {
   store.redeem(ticket.code, 'base');
   assert.equal(store.lookup(ticket.code).baseAt !== null, true);
   assert.deepEqual(store.stats(), { participants: 1, redeemed: 1, extras: 0 });
+  store.redeem(ticket.code, 'bonus', true);
+  const redeemed = store.lookup(ticket.code);
+  const updated = store.retake(participant, 'otra', questions.map(q => q.options.findIndex(option => option.line === 'inteligentes')));
+  assert.equal(updated.code, ticket.code);
+  assert.equal(updated.createdAt, ticket.createdAt);
+  assert.equal(updated.baseAt, redeemed.baseAt);
+  assert.equal(updated.bonusAt, redeemed.bonusAt);
+  assert.deepEqual(updated.result.topIds, ['inteligentes']);
+  assert.deepEqual(store.stats(), { participants: 1, redeemed: 1, extras: 1 });
+  assert.throws(() => store.retake(key(), 'otra', answers), { status: 404 });
 });
 test('sirve sitio, panel y recursos con políticas del navegador', async t => {
   const { request } = await withApp(t);

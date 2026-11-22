@@ -39,6 +39,15 @@ export function createStore(filename) {
         .run(config.eventId, hash(key), code, career, JSON.stringify(answers), new Date().toISOString());
       return this.lookup(code);
     },
+    retake(key, career, answers) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
+        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+      }
+      const row = db.prepare('UPDATE participations SET career=?, answers=? WHERE event=? AND token_hash=? RETURNING *')
+        .get(career, JSON.stringify(answers), config.eventId, hash(key));
+      if (!row) throw Object.assign(new Error('No encontramos tu participación. Acercate al stand con tu código.'), { status: 404 });
+      return expose(row);
+    },
     own(key) {
       if (!/^[a-f0-9]{64}$/.test(key || '')) return null;
       return expose(db.prepare('SELECT * FROM participations WHERE event=? AND token_hash=?').get(config.eventId, hash(key)));

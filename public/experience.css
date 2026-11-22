@@ -15,6 +15,8 @@
 [data-theme="light"] .theme-moon { display:block; }
 .hero-art .art-caption { display:block; position:static; transform:none; text-align:center; margin:0 0 12px; font-size:1.05rem; }
 .hero-art .t3 { bottom:24%; }
+.hero-copy .retake-button { display:flex; width:fit-content; margin-top:14px; }
+@media(max-width:600px) { .hero-copy .retake-button { width:100%; } }
 .section-intro h2 { margin-top:0; }
 .button { background:var(--accent-button); }
 .button.mint { background:#a8e5c0; }

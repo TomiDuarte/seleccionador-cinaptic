@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { randomBytes } from 'node:crypto';
 import { config, questions } from '../../public/content.js';
 
 test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async ({ page, browser }, testInfo) => {
@@ -9,6 +10,7 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   const pageErrors = [];
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
+  await expect(page).toHaveTitle('Seleccionador Cinaptic');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu curiosidad');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('inicio.png'), fullPage: true });
@@ -235,4 +237,59 @@ test('el progreso viejo de prueba no se interpreta con las preguntas nuevas', as
   const stored = await page.evaluate(eventId => JSON.parse(localStorage.getItem(`cinaptic:${eventId}:v1`)), config.eventId);
   expect(stored.ticket).toBeNull();
   expect(stored.key).not.toBe('a'.repeat(64));
+});
+
+test('repetir desde el inicio conserva código y canjes, incluso al salir y recargar', async ({ page, request }, testInfo) => {
+  const key = randomBytes(32).toString('hex');
+  const originalAnswers = questions.map(q => q.options.findIndex(option => option.line === 'comunicaciones'));
+  const created = await request.post('/api/participations', { data: { eventId: config.eventId, key, career: 'sistemas', answers: originalAnswers } });
+  expect(created.status()).toBe(200);
+  const ticket = await created.json();
+  await request.post('/api/admin/login', { data: { password: 'only-for-automated-tests' } });
+  await request.post('/api/admin/redeem', { data: { code: ticket.code, kind: 'base' } });
+  const redeemed = await (await request.post('/api/admin/redeem', { data: { code: ticket.code, kind: 'bonus', confirmed: true } })).json();
+  const before = await (await request.get('/api/admin/stats')).json();
+  await page.goto('/');
+  await page.evaluate(({ eventId, key, ticket }) => localStorage.setItem(`cinaptic:${eventId}:v1`, JSON.stringify({
+    key, career: ticket.career, answers: ticket.answers, step: 6, ticket, retaking: false,
+  })), { eventId: config.eventId, key, ticket });
+  await page.reload();
+  await expect(page).toHaveTitle('Seleccionador Cinaptic');
+  await page.screenshot({ path: testInfo.outputPath('inicio-repetir.png'), fullPage: true, animations: 'disabled' });
+  await page.getByRole('button', { name: 'Volver a responder el quiz' }).click();
+  await page.getByLabel('Tu carrera o etapa').selectOption('otra');
+  await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+  const chosen = questions[0].options.findIndex(option => option.line === 'software');
+  await page.getByRole('radio').nth(chosen).check();
+  await page.getByRole('link', { name: 'CInApTIC, inicio', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Salir', exact: true }).click();
+  await page.getByRole('button', { name: 'Continuar el quiz' }).click();
+  await page.reload();
+  await expect(page.getByRole('radio').nth(chosen)).toBeChecked();
+  for (let i = 0; i < questions.length; i++) {
+    if (i > 0) await page.getByRole('radio').nth(questions[i].options.findIndex(option => option.line === 'software')).check();
+    if (i < questions.length - 1) await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+  }
+  await page.route('**/api/participations/retake', route => route.abort());
+  await page.getByRole('button', { name: 'Descubrir mi resultado' }).click();
+  await expect(page.getByRole('alert')).toContainText('No pudimos conectar');
+  await page.unroute('**/api/participations/retake');
+  await page.getByRole('button', { name: 'Reintentar', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ingeniería de Software');
+  await expect(page.locator('.ticket-code')).toHaveText(ticket.code);
+  await expect(page.getByRole('heading', { name: '¡Premio inicial canjeado!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '¡Extra canjeado!' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Ingeniería de Software');
+  await expect(page.locator('.ticket-code')).toHaveText(ticket.code);
+  const own = await (await request.get('/api/participation', { headers: { Authorization: `Bearer ${key}` } })).json();
+  expect(own.code).toBe(ticket.code);
+  expect(own.baseAt).toBe(redeemed.baseAt);
+  expect(own.bonusAt).toBe(redeemed.bonusAt);
+  expect(await (await request.get('/api/admin/stats')).json()).toEqual(before);
+  const state = await page.evaluate(eventId => JSON.parse(localStorage.getItem(`cinaptic:${eventId}:v1`)), config.eventId);
+  expect(state.key).toBe(key);
+  expect(state.retaking).toBe(false);
 });

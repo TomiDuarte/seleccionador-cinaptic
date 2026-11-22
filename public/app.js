@@ -13,7 +13,7 @@ const paths = {
   chat: '<path d="M21 11a9 9 0 0 1-9 9c-2 0-3-.3-5-1l-5 2 2-5a9 9 0 1 1 17-5Z"/><path d="M8 11h8M8 7h5M8 15h5"/>',
 };
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.spark}</svg>`;
-const blankState = () => ({ key: [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join(''), career: '', answers: questions.map(() => null), step: 0, ticket: null });
+const blankState = () => ({ key: [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join(''), career: '', answers: questions.map(() => null), step: 0, ticket: null, retaking: false });
 let state = blankState();
 let storageAvailable = true;
 try {
@@ -23,6 +23,7 @@ try {
     state = { ...saved, ticket: saved.ticket && /^CN-[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(saved.ticket.code) && validAnswers(saved.ticket.answers) ? { ...saved.ticket, result: calculateResult(saved.ticket.answers) } : null };
   }
 } catch { storageAvailable = false; }
+state.retaking = state.retaking === true && !!state.ticket;
 function persist() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { storageAvailable = false; } }
 persist();
 let toastTimer;
@@ -36,7 +37,7 @@ function renderHome() {
       <h1 id="hero-title">Tu curiosidad<br>tiene un <span>lugar.</span></h1>
       <p>Ponete el sombrero de la investigación y descubrí qué línea del CInApTIC conecta con vos.</p>
       <a class="button" href="#${state.ticket ? 'resultado' : 'quiz'}">${icon('spark')}${action}</a>
-      <p class="micro">Unos 2 minutos · Sin respuestas incorrectas · Con premio</p></div>
+      ${state.ticket ? `<button class="button secondary retake-button" type="button" id="retake-quiz">${state.retaking ? 'Continuar el quiz' : 'Volver a responder el quiz'}</button><p class="micro">Conservás tu código y los premios ya canjeados.</p>` : '<p class="micro">Unos 2 minutos · Sin respuestas incorrectas · Con premio</p>'}</div>
       <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad.">${lines.map((line, i) => `<span class="orbit-tag t${i + 1}">${line.name}</span>`).join('')}<span class="art-caption">Tu próxima gran idea empieza con curiosidad.</span></div>
     </section>
     <section class="journey" aria-label="Cómo participar">
@@ -54,6 +55,16 @@ function renderHome() {
       <details><summary>¿Cómo canjeo el premio y el extra?</summary><p>Al terminar recibís un código. Mostralo en el stand para canjearlo por ${config.reward}, sujeto a disponibilidad. Cada código admite un canje inicial y uno extra. Para el extra, compartí la experiencia por WhatsApp, Instagram u otra red y mostrá el mensaje o la publicación al equipo.</p></details>
       <details><summary>¿El resultado decide dónde puedo investigar?</summary><p>Es una recomendación lúdica a partir de tus intereses, no una evaluación vocacional ni una asignación al centro. Las preguntas y sus puntajes se diseñaron para esta experiencia. Si te interesan varias líneas, ¡conversemos sobre todas!</p></details>
     </section>`;
+  document.querySelector('#retake-quiz')?.addEventListener('click', () => {
+    if (!state.retaking) {
+      ticketRevision++;
+      state.retaking = true;
+      state.answers = questions.map(() => null);
+      state.step = 0;
+      persist();
+    }
+    location.hash = 'quiz';
+  });
 }
 
 const encouragement = [
@@ -69,8 +80,9 @@ const goalLabels = ['Tu descubrimiento empieza acá', '¡Ya diste el primer paso
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let submitting = false;
 let celebrateResult = false;
+let ticketRevision = 0;
 function renderQuiz(previousStep = state.step) {
-  if (state.ticket) { location.hash = 'resultado'; return; }
+  if (state.ticket && !state.retaking) { location.hash = 'resultado'; return; }
   const step = state.step;
   const question = questions[step - 1];
   main.innerHTML = `<section class="quiz-shell"><div class="quiz-top"><button class="close-button" id="exit-quiz" type="button" aria-label="Salir del cuestionario">×</button><div class="goal-progress"><div class="progress" role="progressbar" aria-label="Progreso hacia tu resultado" aria-valuemin="0" aria-valuemax="7" aria-valuenow="${step}" aria-valuetext="${step} de 7 etapas completadas"><div class="progress-fill step-${step}"></div></div><span class="goal-prize ${step >= 5 ? 'almost' : ''}" aria-hidden="true">${icon('gift')}</span></div></div><p class="goal-caption">${goalLabels[step]}</p>
@@ -105,10 +117,11 @@ function renderQuiz(previousStep = state.step) {
     document.querySelector('[role="progressbar"]').setAttribute('aria-valuetext', 'Todas las etapas completadas');
     try {
       const [ticket] = await Promise.all([
-        api('/api/participations', { method: 'POST', body: JSON.stringify({ eventId: config.eventId, key: state.key, career: state.career, answers: state.answers }) }),
+        api(state.retaking ? '/api/participations/retake' : '/api/participations', { method: 'POST', body: JSON.stringify({ eventId: config.eventId, key: state.key, career: state.career, answers: state.answers }) }),
         new Promise(resolve => setTimeout(resolve, 3500)),
       ]);
-      state.ticket = ticket; persist();
+      ticketRevision++;
+      state.ticket = ticket; state.retaking = false; persist();
       reveal.close();
       if (location.hash === '#quiz') { celebrateResult = true; location.hash = 'resultado'; }
     } catch (error) {
@@ -163,8 +176,10 @@ let syncingTicket = false;
 async function syncTicket() {
   if (syncingTicket || !state.ticket || location.hash !== '#resultado' || document.hidden) return;
   syncingTicket = true;
+  const revision = ticketRevision;
   try {
     const updated = await api('/api/participation', { headers: { Authorization: `Bearer ${state.key}` } });
+    if (ticketRevision !== revision) return;
     state.ticket = updated;
     persist();
     if (location.hash !== '#resultado') return;
@@ -225,7 +240,7 @@ document.querySelector('#copy-invitation').onclick = async () => {
 // Keep navigation through the logo or other internal links from discarding the quiz unexpectedly.
 document.addEventListener('click', event => {
   const link = event.target.closest('a');
-  if (!link || location.hash !== '#quiz' || state.ticket || link.target === '_blank' || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  if (!link || location.hash !== '#quiz' || (state.ticket && !state.retaking) || link.target === '_blank' || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
   const destination = new URL(link.href);
   if (destination.origin === location.origin && destination.hash !== '#quiz' && destination.hash !== '#main') {
     event.preventDefault(); confirmExit(() => location.assign(destination.href));

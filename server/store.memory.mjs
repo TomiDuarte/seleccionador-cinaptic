@@ -43,6 +43,16 @@ export function createMemoryStore() {
       byToken.set(tokenHash, row);
       return expose(row);
     },
+    retake(key, career, answers) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
+        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+      }
+      const row = byToken.get(hash(key));
+      if (!row) throw Object.assign(new Error('No encontramos tu participación. Acercate al stand con tu código.'), { status: 404 });
+      row.career = career;
+      row.answers = [...answers];
+      return expose(row);
+    },
     own(key) {
       if (!/^[a-f0-9]{64}$/.test(key || '')) return null;
       return expose(byToken.get(hash(key)));

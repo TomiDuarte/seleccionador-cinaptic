@@ -70,6 +70,19 @@ export async function createPostgresStore(connectionString) {
       }
       throw Object.assign(new Error('No pudimos generar un código único. Volvé a intentar.'), { status: 500 });
     },
+    async retake(key, career, answers) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
+        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+      }
+      // Only answers and career change: the original coupon and redemption dates survive.
+      const rows = await sql`
+        UPDATE participations SET career = ${career}, answers = ${JSON.stringify(answers)}::jsonb
+        WHERE event = ${config.eventId} AND token_hash = ${hash(key)}
+        RETURNING *
+      `;
+      if (!rows.length) throw Object.assign(new Error('No encontramos tu participación. Acercate al stand con tu código.'), { status: 404 });
+      return expose(rows[0]);
+    },
     async own(key) {
       if (!/^[a-f0-9]{64}$/.test(key || '')) return null;
       const rows = await sql`
