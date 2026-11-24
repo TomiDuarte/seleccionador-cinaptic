@@ -186,8 +186,22 @@ test('el almacén temporal emite, consulta y canjea participaciones', () => {
 });
 test('sirve sitio, panel y recursos con políticas del navegador', async t => {
   const { request } = await withApp(t);
-  for (const path of ['/', '/admin', '/app.js', '/styles.css', '/hat.svg']) {
+  for (const path of ['/', '/admin', '/app.js', '/styles.css', '/hat.svg', '/favicon.svg']) {
     const response = await request(path); assert.equal(response.status, 200);
     assert.ok(response.headers.get('content-security-policy').includes("frame-ancestors 'none'"));
   }
+});
+
+test('Vercel sin PostgreSQL nunca emite códigos en memoria temporal', async t => {
+  const previous = process.env.VERCEL;
+  process.env.VERCEL = '1';
+  t.after(() => { process.env.VERCEL = previous; });
+  const { request } = await withApp(t);
+  const health = await request('/api/health');
+  assert.equal(health.status, 503);
+  assert.deepEqual(await health.json(), { ok: false, database: 'unconfigured' });
+  const issue = await request('/api/participations', { key: key(), career: 'otra', answers });
+  assert.equal(issue.status, 503);
+  assert.equal((await issue.json()).code, 'STORAGE_UNAVAILABLE');
+  assert.equal((await request('/')).status, 200);
 });

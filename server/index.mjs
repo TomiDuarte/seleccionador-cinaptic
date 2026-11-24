@@ -24,10 +24,11 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
     process.env.POSTGRES_PRISMA_URL ||
     process.env.POSTGRES_URL_NON_POOLING ||
     process.env.NEON_DATABASE_URL;
+  const missingDatabase = Boolean(process.env.VERCEL && !postgresUrl);
   const storeReady = postgresUrl
     ? createPostgresStore(postgresUrl)
-    : process.env.VERCEL
-      ? import('./store.memory.mjs').then(({ getSharedMemoryStore }) => getSharedMemoryStore())
+    : missingDatabase
+      ? Promise.resolve(null)
       : import('./store.sqlite.mjs').then(({ createStore }) => createStore(database));
   const sessions = new Map();
   const limits = new Map();
@@ -59,10 +60,12 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
           return res.end(req.method === 'HEAD' ? undefined : body);
         } catch { return json(404, { error: 'No encontrado.' }); }
       }
-      if (url.pathname === '/api/health' && req.method === 'GET') return json(200, {
-        ok: true,
-        database: postgresUrl ? 'postgres' : process.env.VERCEL ? 'memory' : 'sqlite',
+      if (url.pathname === '/api/health' && req.method === 'GET') return json(missingDatabase ? 503 : 200, {
+        ok: !missingDatabase,
+        database: postgresUrl ? 'postgres' : missingDatabase ? 'unconfigured' : 'sqlite',
       });
+      // Serverless memory is temporary: never issue redeemable coupons into it.
+      if (missingDatabase) return json(503, { code: 'STORAGE_UNAVAILABLE', error: 'El registro de premios está temporalmente fuera de servicio. Tus respuestas siguen guardadas. Avisá al equipo del stand.' });
       const store = await storeReady;
       if (!['GET', 'POST'].includes(req.method)) return json(405, { error: 'Método no permitido.' });
       let body = {};
@@ -139,7 +142,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
       else res.end();
     }
   });
-  server.on('close', () => storeReady.then(store => store.close()));
+  server.on('close', () => storeReady.then(store => store?.close()).catch(() => {}));
   return server;
 }
 
