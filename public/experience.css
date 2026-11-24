@@ -1,6 +1,6 @@
 /* Brand assets, themes and the guided quiz experience. */
-:root { --surface: #192b21; --surface-soft: #22392b; --selected: #302b3b; --accent-button: #d0b5ff; --goal: #a8e5c0; --danger: #ffc1be; --danger-bg: #552724; }
-:root[data-theme="light"] { color-scheme: light; --bg: #f5f8f6; --text: #172d25; --muted: #526459; --mint: #246545; --lavender: #75509e; --border: #cedbd1; --surface: #fff; --surface-soft: #e7f0e9; --selected: #eee4fa; --goal: #3c9666; --danger: #a82828; --danger-bg: #fff0ef; }
+:root { --surface: #112b3d; --surface-soft: #19394f; --selected: #1c425a; --accent-button: #6bd2e5; --button-text: #092a3c; --goal: #a4cf74; --danger: #ffc1be; --danger-bg: #552724; }
+:root[data-theme="light"] { color-scheme: light; --bg: #f4f8fb; --text: #15394f; --muted: #496577; --mint: #176b82; --lavender: #754391; --brand: #125476; --green: #417223; --orange: #995017; --border: #c5d7e3; --surface: #fff; --surface-soft: #e7f1f7; --selected: #def0f7; --accent-button: #145575; --button-text: #fff; --goal: #548b2e; --danger: #a82828; --danger-bg: #fff0ef; }
 .brand-logo { display:block; width:190px; height:auto; }
 .logo-light { display:none; }
 [data-theme="light"] .logo-light { display:block; }
@@ -202,3 +202,43 @@ body[data-view="quiz"] .header-pill { display:none; }
 .home-button:active { transform:translateY(3px); box-shadow:0 1px 0 #43835a; }
 @media(max-width:600px) { .result-actions { flex-direction:column; } .result-actions .button { width:100%; } }
 @media(prefers-reduced-motion:reduce) { .experience-dialog[open],.hat-coach.cheering img,.hat-coach.cheering .hat-speech,.goal-prize.almost,.question-arriving,.reveal-art img,.reveal-art span,.reveal-art::before,.reveal-art::after,.celebrating .result-header,.celebration span { animation:none; } .celebration { display:none; } }
+
+/* Institutional navy and cyan, with the logo's green and orange as accents.
+   The original purple hat artwork remains untouched. */
+.hero h1 span,.result-header h1 { color:var(--brand); }
+.button { background:var(--accent-button); color:var(--button-text); }
+.button:hover { background:var(--accent-button); filter:brightness(1.08); }
+.button.secondary { color:var(--text); background:transparent; border-color:var(--border); }
+.button.secondary:hover,[data-theme="light"] .button.secondary:hover { background:var(--surface-soft); }
+.button.mint { background:#a4cf74; color:#203311; }
+.invitation { background:var(--accent-button); color:var(--button-text); }
+.invitation p { color:inherit; }
+.invitation .button { background:#092a3c; color:#fff; border-color:#75bed3; }
+.orbit-tag,[data-theme="light"] .orbit-tag { background:var(--surface-soft); border-color:var(--border); box-shadow:0 6px 20px #03131f26; }
+.tag,[data-theme="light"] .tag { color:var(--text); border-color:var(--border); }
+.header-pill,.option,[data-theme="light"] .header-pill,[data-theme="light"] .option,[data-theme="light"] .button.secondary { border-color:var(--border); }
+.option:hover,.option:has(input:checked) { border-color:var(--brand); }
+.option input,.score-bar { accent-color:var(--brand); }
+.option:focus-within { outline-color:var(--brand); }
+.select-wrap select,.select-wrap option,input[type="password"],input[type="text"],[data-theme="light"] .select-wrap select,[data-theme="light"] .select-wrap option,[data-theme="light"] input[type="password"],[data-theme="light"] input[type="text"] { background:var(--surface); border-color:var(--border); }
+.line-card .line-icon,[data-theme="light"] .line-card .line-icon { background:var(--surface-soft); color:var(--brand); }
+.discovery-card.software { --line-accent:var(--green); --line-tint:#233f36; }
+[data-theme="light"] .discovery-card.software { --line-tint:#edf5e5; }
+.line-card.software .line-icon,[data-theme="light"] .line-card.software .line-icon { background:var(--line-tint); color:var(--green); }
+.discovery-card.inteligentes { --line-accent:var(--orange); --line-tint:#413329; }
+[data-theme="light"] .discovery-card.inteligentes { --line-accent:var(--orange); --line-tint:#fff0df; }
+.line-card.inteligentes .line-icon,[data-theme="light"] .line-card.inteligentes .line-icon { background:var(--line-tint); color:var(--orange); }
+.share-panel,[data-theme="light"] .share-panel { background:var(--surface-soft); border-color:var(--border); }
+.ticket { background:#cdeaf3; color:#123e55; }
+.ticket p,.ticket small,.ticket .eyebrow { color:#31586b; }
+.ticket-code { border-color:#86afc1; }
+.ticket .button { background:transparent; color:#123e55; border-color:#729db0; }
+.ticket .button:hover { background:#b5dce9; }
+.goal-prize { color:var(--orange); background:var(--surface-soft); }
+.home-button { box-shadow:0 4px 0 #537c30; }
+.home-button:active { box-shadow:0 1px 0 #537c30; }
+.admin-status,[data-theme="light"] .admin-status { background:var(--surface-soft); }
+.experience-dialog::backdrop { background:#041420cc; }
+.reveal-dialog::backdrop { background:radial-gradient(ellipse at 50% 42%,#20435d99,transparent 60%),#091925f5; }
+[data-theme="light"] .reveal-dialog::backdrop { background:radial-gradient(ellipse at 50% 42%,#bde6f299,transparent 60%),#f4f8fbf5; }
+.button.danger { background:var(--danger-bg); color:var(--danger); border-color:var(--danger); }

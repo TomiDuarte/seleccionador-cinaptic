@@ -33,6 +33,8 @@ Para probar desde un teléfono, conectarlo al mismo Wi-Fi y abrir `http://IP-LOC
 8. Tema claro/oscuro que sigue al sistema inicialmente y conserva la elección manual. Logos institucionales adaptados al fondo, progreso visual, mensajes animados del sombrero y revelación del resultado. Respeta la preferencia de movimiento reducido. Salir con la X pide confirmación y conserva el progreso.
 9. Después de completar el cuestionario, el inicio ofrece **Volver a responder el quiz**. Actualiza la carrera, las respuestas y la recomendación, conservando el identificador del navegador, el código original y los canjes inicial/extra. Si se interrumpe, **Continuar el quiz** retoma las respuestas nuevas sin perder el resultado anterior. El endpoint de repetición solo actualiza una participación existente: nunca emite un código nuevo.
 
+Si una participación antigua sigue en el navegador pero ya no existe en el servidor, repetir el quiz calcula y guarda la nueva recomendación localmente. Conserva el código original y las fechas de canje conocidas, sin emitir otro premio ni reconstruir registros a partir del cliente. El pase indica que requiere revisión en el stand. Al recuperar el registro, la aplicación sincroniza las respuestas pendientes mediante el endpoint de repetición, que solo actualiza registros existentes.
+
 Los visitantes conservan el progreso en su navegador. Si una solicitud falla pueden reintentar. El resultado puede recuperarse al recargar. El estado de canje se actualiza automáticamente al entrar al resultado, volver a la pestaña o recuperar la conexión, y cada 15 segundos mientras se visualiza. La revelación final ocupa la pantalla sin recuadro durante al menos 3,5 segundos para leer el mensaje; con movimiento reducido se mantiene ese tiempo sin animaciones.
 
 ## Operar el stand
@@ -94,6 +96,8 @@ El proyecto incluye `api/index.mjs` y `vercel.json`. Para producción hay que cr
 - `COOKIE_SECURE=true`.
 
 También puede aparecer como `POSTGRES_URL`; el servidor acepta ambos nombres. El adaptador crea automáticamente las tablas necesarias y conserva participaciones y canjes en PostgreSQL.
+
+**Pendiente de producción: conectar PostgreSQL.** Si `/api/health` responde `database: "memory"`, el despliegue está usando almacenamiento temporal: participaciones y canjes pueden desaparecer al reiniciar o cambiar de instancia. Configurar `DATABASE_URL` en el proyecto de Vercel y volver a desplegar; el endpoint deberá informar `database: "postgres"`. Esto identifica la configuración, no reemplaza una prueba de conexión. Los registros perdidos en memoria no se pueden reconstruir con sus canjes verificados desde el navegador. La protección para impedir nuevas emisiones temporales está preparada en la rama `fix/persistencia-premios`; integrarla al conectar PostgreSQL, porque sin esa conexión devuelve 503 para los canjes.
 
 En el repositorio de GitHub, importá el proyecto en Vercel y desplegá la rama `main`. El build no necesita una base de datos SQLite local ni disco persistente. No configurés `DATABASE_PATH` en Vercel.
 

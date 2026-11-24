@@ -37,7 +37,7 @@ function renderHome() {
       <h1 id="hero-title">Tu curiosidad<br>tiene un <span>lugar.</span></h1>
       <p>Ponete el sombrero de la investigación y descubrí qué línea del CInApTIC conecta con vos.</p>
       <a class="button" href="#${state.ticket ? 'resultado' : 'quiz'}">${icon('spark')}${action}</a>
-      ${state.ticket ? `<button class="button secondary retake-button" type="button" id="retake-quiz">${state.retaking ? 'Continuar el quiz' : 'Volver a responder el quiz'}</button><p class="micro">Conservás tu código y los premios ya canjeados.</p>` : '<p class="micro">Unos 2 minutos · Sin respuestas incorrectas · Con premio</p>'}</div>
+      ${state.ticket ? `<button class="button secondary retake-button" type="button" id="retake-quiz">${state.retaking ? 'Continuar el quiz' : 'Volver a responder el quiz'}</button><p class="micro">Conservás tu código y los premios ya canjeados.</p>` : ''}</div>
       <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad.">${(state.ticket ? lines.map(line => line.name) : ['Tu curiosidad', 'Tus ideas', 'Tu próximo descubrimiento']).map((label, i) => `<span class="orbit-tag t${i + 1}">${label}</span>`).join('')}<span class="art-caption">Tu próxima gran idea empieza con curiosidad.</span></div>
     </section>
     <section class="journey" aria-label="Cómo participar">
@@ -144,7 +144,7 @@ function renderQuiz(previousStep = state.step) {
     document.querySelector('[role="progressbar"]').setAttribute('aria-valuetext', 'Todas las etapas completadas');
     try {
       const [ticket] = await Promise.all([
-        api(state.retaking ? '/api/participations/retake' : '/api/participations', { method: 'POST', body: JSON.stringify({ eventId: config.eventId, key: state.key, career: state.career, answers: state.answers }) }),
+        submitParticipation(),
         new Promise(resolve => setTimeout(resolve, 3500)),
       ]);
       ticketRevision++;
@@ -164,8 +164,27 @@ async function api(path, options = {}) {
   try { response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...options.headers }, signal: AbortSignal.timeout(15000) }); }
   catch { throw new Error('No pudimos conectar. Tus respuestas siguen acá: comprobá tu conexión y volvé a intentar.'); }
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'No pudimos completar la operación.');
+  if (!response.ok) throw Object.assign(new Error(data.error || 'No pudimos completar la operación.'), { status: response.status, code: data.code });
   return data;
+}
+
+async function submitParticipation() {
+  const body = { eventId: config.eventId, key: state.key, career: state.career, answers: [...state.answers] };
+  try {
+    return await api(state.retaking ? '/api/participations/retake' : '/api/participations', { method: 'POST', body: JSON.stringify(body) });
+  } catch (error) {
+    if (!state.retaking || !state.ticket || (error.status !== 404 && error.code !== 'STORAGE_UNAVAILABLE')) throw error;
+    // Old test records may be gone. Keep the original coupon and redemption history;
+    // only the recommendation can be calculated locally. Never issue a replacement.
+    return { ...state.ticket, career: body.career, answers: body.answers, result: calculateResult(body.answers), syncPending: true, couponUnavailable: true };
+  }
+}
+
+function ticketHeading(ticket) {
+  return ticket.couponUnavailable ? 'Tu código necesita revisión' : ticket.baseAt ? '¡Premio inicial canjeado!' : 'La curiosidad tiene premio.';
+}
+function ticketMessage(ticket) {
+  return ticket.couponUnavailable ? 'Tu resultado está guardado en este navegador. Conservamos el código original, pero no pudimos verificar su registro de canje. Acercate al stand para revisarlo; repetir el quiz no genera otro premio.' : ticket.baseAt ? 'Este código ya registró su primer canje.' : 'Mostrá este código en el stand del CInApTIC y canjealo por un dulce premio';
 }
 
 function renderResult() {
@@ -175,7 +194,7 @@ function renderResult() {
   const tied = matching.length > 1;
   main.innerHTML = `<section class="result-shell ${celebrateResult ? 'celebrating' : ''}"><header class="result-header">${celebrateResult ? '<div class="celebration" aria-hidden="true"><span>✦</span><span>✧</span><span>✦</span><span>✧</span><span>✦</span></div>' : ''}<div class="result-star" aria-hidden="true">✦</div><span class="eyebrow">El sombrero encontró tu conexión</span><h1>${tied ? '¡Curiosidad sin fronteras!' : matching[0].name}</h1><p>${tied ? `Tus respuestas conectan por igual con ${matching.map(line => line.name).join(' y ')}. Tenés más de un camino para explorar.` : matching[0].match}</p></header>
     <div class="result-grid"><section class="result-panel"><h2>Lo que despertó tu curiosidad</h2><p>Así se repartieron tus ${questions.length} elecciones. Es una invitación a explorar.</p>${ticket.result.ranking.map(item => `<div class="score-row"><span>${lines.find(line => line.id === item.id).name}</span><span>${item.score} de ${questions.length}</span></div><progress class="score-bar" max="${questions.length}" value="${item.score}" aria-label="${lines.find(line => line.id === item.id).name}: ${item.score} de ${questions.length}"></progress>`).join('')}<div class="result-project">${matching.map(line => `<p><strong>${line.name}</strong><br>${line.project}</p>`).join('')}<a href="${config.officialUrl}" target="_blank" rel="noopener noreferrer">Explorá los proyectos del centro</a></div></section>
-    <div><section class="ticket"><span class="eyebrow">Tu pase al lado dulce</span><h2>${ticket.baseAt ? '¡Premio inicial canjeado!' : 'La curiosidad tiene premio.'}</h2><p>${ticket.baseAt ? 'Este código ya registró su primer canje.' : 'Mostrá este código en el stand del CInApTIC y canjealo por un dulce premio'}</p><code class="ticket-code">${esc(ticket.code)}</code><button class="button small full" id="copy-code">Copiar mi código</button><small>Un canje inicial y un extra por código. Sujeto a disponibilidad. Guardá una captura para tenerlo a mano.</small></section>
+    <div><section class="ticket"><span class="eyebrow">Tu pase al lado dulce</span><h2>${ticketHeading(ticket)}</h2><p>${ticketMessage(ticket)}</p><code class="ticket-code">${esc(ticket.code)}</code><button class="button small full" id="copy-code">Copiar mi código</button><small>Un canje inicial y un extra por código. Sujeto a disponibilidad. Guardá una captura para tenerlo a mano.</small></section>
     <section class="share-panel"><h3>${icon('gift')} ${ticket.bonusAt ? '¡Extra canjeado!' : 'Compartí la curiosidad.'}</h3><p>${ticket.bonusAt ? 'El stand ya registró tu premio por compartir.' : 'Invitá a alguien. Mostrá el mensaje o la publicación en el stand y llevate un premio extra.'}</p><a class="button mint small full" id="share" href="${shareUrl(matching)}" target="_blank" rel="noopener noreferrer">Compartir por WhatsApp</a><div class="share-actions"><button class="button secondary" type="button" id="copy-link">Copiar enlace</button><a class="button secondary" href="${xShareUrl(matching)}" target="_blank" rel="noopener noreferrer">Compartir en X</a><button class="button secondary" type="button" id="share-instagram">Instagram</button><button class="button secondary" type="button" id="share-native">Más opciones</button></div><p class="privacy-note">¡Elegí tu próximo compañero de investigación!</p></section></div></div>
     <section class="result-contact"><span class="eyebrow">Esto puede ser el comienzo</span><h2>¿Seguimos esta conversación?</h2><p>Mostranos tu resultado en el stand. Conocé al equipo y consultá cómo dar tus primeros pasos en investigación.</p><div class="result-actions">${config.contactUrl ? `<a class="button" href="${esc(config.contactUrl)}" target="_blank" rel="noopener noreferrer">Quiero sumarme al CInApTIC</a>` : `<a class="button" href="#lineas">Conocer las tres líneas</a>`}<a class="button mint home-button" href="#inicio">${icon('spark')}Volver al inicio</a></div></section>
     <p class="error" id="result-error" role="alert"></p></section>`;
@@ -205,21 +224,31 @@ async function syncTicket() {
   syncingTicket = true;
   const revision = ticketRevision;
   try {
-    const updated = await api('/api/participation', { headers: { Authorization: `Bearer ${state.key}` } });
+    const updated = state.ticket.syncPending
+      ? await api('/api/participations/retake', { method: 'POST', body: JSON.stringify({ eventId: config.eventId, key: state.key, career: state.ticket.career, answers: state.ticket.answers }) })
+      : await api('/api/participation', { headers: { Authorization: `Bearer ${state.key}` } });
     if (ticketRevision !== revision) return;
     state.ticket = updated;
     persist();
     if (location.hash !== '#resultado') return;
     // Update only status copy, preserving keyboard focus and open share dialogs.
-    if (updated.baseAt) {
-      document.querySelector('.ticket h2').textContent = '¡Premio inicial canjeado!';
-      document.querySelector('.ticket > p').textContent = 'Este código ya registró su primer canje.';
-    }
+    document.querySelector('.ticket h2').textContent = ticketHeading(updated);
+    document.querySelector('.ticket > p').textContent = ticketMessage(updated);
     if (updated.bonusAt) {
       document.querySelector('.share-panel h3').innerHTML = `${icon('gift')} ¡Extra canjeado!`;
       document.querySelector('.share-panel > p').textContent = 'El stand ya registró tu premio por compartir.';
     }
-  } catch { /* Offline visitors retain their saved ticket. Retry on return or reconnection. */ }
+  } catch (error) {
+    if ((error.status === 404 || error.code === 'STORAGE_UNAVAILABLE') && revision === ticketRevision) {
+      state.ticket.couponUnavailable = true;
+      persist();
+      if (location.hash === '#resultado') {
+        document.querySelector('.ticket h2').textContent = ticketHeading(state.ticket);
+        document.querySelector('.ticket > p').textContent = ticketMessage(state.ticket);
+      }
+    }
+    // Offline visitors retain their saved ticket. Retry on return or reconnection.
+  }
   finally { syncingTicket = false; }
 }
 window.addEventListener('focus', syncTicket);

@@ -6,7 +6,7 @@
   try { chosen = localStorage.getItem(key); } catch { /* System theme works without storage. */ }
   function apply(theme) {
     root.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#101c19' : '#f5f8f6');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#091925' : '#f4f8fb');
     document.querySelectorAll('.theme-toggle').forEach(button => {
       const label = theme === 'dark' ? 'Activar modo claro' : 'Activar modo oscuro';
       button.setAttribute('aria-label', label);

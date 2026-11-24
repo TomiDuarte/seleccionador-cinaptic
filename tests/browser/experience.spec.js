@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import { config, questions, lines } from '../../public/content.js';
+import { calculateResult } from '../../public/quiz.js';
 
 test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async ({ page, browser }, testInfo) => {
   await page.addInitScript(() => {
@@ -11,6 +12,8 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   page.on('pageerror', error => pageErrors.push(error.message));
   await page.goto('/');
   await expect(page).toHaveTitle('Seleccionador Cinaptic');
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', '/favicon.svg');
+  await expect(page.locator('main')).not.toContainText('Unos 2 minutos');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Tu curiosidad');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('inicio.png'), fullPage: true });
@@ -140,6 +143,8 @@ test('temas persistentes, logos y confirmación de salida conservan el progreso'
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(9, 25, 37)');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#091925');
   await expect(page.locator('.brand .logo-dark')).toBeVisible();
   expect(await page.locator('.brand .logo-dark').evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true);
   await expect(page.getByRole('link', { name: 'El centro', exact: true })).toHaveAttribute('href', /frre.utn.edu.ar.*CInApTIC/);
@@ -152,6 +157,7 @@ test('temas persistentes, logos y confirmación de salida conservan el progreso'
   await expect(page.locator('.brand .logo-light')).toBeVisible();
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#f4f8fb');
   await page.screenshot({ path: testInfo.outputPath('inicio-claro.png'), fullPage: true });
   await page.getByRole('link', { name: 'Descubrir mi línea', exact: true }).click();
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
@@ -348,3 +354,58 @@ test('repetir desde el inicio conserva código y canjes, incluso al salir y reca
   expect(state.key).toBe(key);
   expect(state.retaking).toBe(false);
 });
+
+for (const recoverable of [false, true]) {
+  test(`registro ausente al repetir: resultado local sin otro premio${recoverable ? ' y sincronización posterior' : ''}`, async ({ page, request }, testInfo) => {
+    const key = randomBytes(32).toString('hex');
+    const initialAnswers = questions.map(q => q.options.findIndex(option => option.line === 'comunicaciones'));
+    let ticket = { code: 'CN-ZZZZZ-YYYYY', career: 'otra', answers: initialAnswers, createdAt: '2026-11-20T12:00:00.000Z', baseAt: '2026-11-20T12:01:00.000Z', bonusAt: '2026-11-20T12:02:00.000Z', result: calculateResult(initialAnswers) };
+    await request.post('/api/admin/login', { data: { password: 'only-for-automated-tests' } });
+    if (recoverable) {
+      ticket = await (await request.post('/api/participations', { data: { eventId: config.eventId, key, career: 'otra', answers: initialAnswers } })).json();
+      await request.post('/api/admin/redeem', { data: { code: ticket.code, kind: 'base' } });
+      ticket = await (await request.post('/api/admin/redeem', { data: { code: ticket.code, kind: 'bonus', confirmed: true } })).json();
+      await page.route('**/api/participations/retake', route => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'No encontramos tu participación.' }) }));
+    }
+    const before = await (await request.get('/api/admin/stats')).json();
+    let newCoupons = 0;
+    page.on('request', req => { if (new URL(req.url()).pathname === '/api/participations' && req.method() === 'POST') newCoupons++; });
+    await page.goto('/');
+    await page.evaluate(({ eventId, key, ticket }) => localStorage.setItem(`cinaptic:${eventId}:v1`, JSON.stringify({ key, career: ticket.career, answers: ticket.answers, step: 6, ticket })), { eventId: config.eventId, key, ticket });
+    await page.reload();
+    await page.getByRole('button', { name: 'Volver a responder el quiz' }).click();
+    await page.getByRole('button', { name: 'Continuar', exact: true }).click();
+    await expect(page.getByRole('radio').nth(2)).toHaveAccessibleName('En una computadora que aprende a reconocer patrones mediante figuras.');
+    for (let i = 0; i < questions.length; i++) {
+      await page.getByRole('radio').nth(questions[i].options.findIndex(option => option.line === 'inteligentes')).check();
+      await page.getByRole('button', { name: i === questions.length - 1 ? 'Descubrir mi resultado' : 'Continuar', exact: true }).click();
+    }
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sistemas Inteligentes');
+    await expect(page.locator('.ticket-code')).toHaveText(ticket.code);
+    await expect(page.getByRole('heading', { name: 'Tu código necesita revisión' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sistemas Inteligentes');
+    await expect(page.locator('.ticket-code')).toHaveText(ticket.code);
+    const saved = await page.evaluate(eventId => JSON.parse(localStorage.getItem(`cinaptic:${eventId}:v1`)), config.eventId);
+    expect(saved.key).toBe(key);
+    expect(saved.ticket.baseAt).toBe(ticket.baseAt);
+    expect(saved.ticket.bonusAt).toBe(ticket.bonusAt);
+    expect(saved.ticket.syncPending).toBe(true);
+    expect(saved.retaking).toBe(false);
+    await page.screenshot({ path: testInfo.outputPath('resultado-recuperado.png'), fullPage: true, animations: 'disabled' });
+    if (recoverable) {
+      await page.unroute('**/api/participations/retake');
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await expect(page.getByRole('heading', { name: '¡Premio inicial canjeado!' })).toBeVisible();
+      const own = await (await request.get('/api/participation', { headers: { Authorization: `Bearer ${key}` } })).json();
+      expect(own.result.topIds).toEqual(['inteligentes']);
+      expect(own.code).toBe(ticket.code);
+      expect(own.baseAt).toBe(ticket.baseAt);
+      expect(own.bonusAt).toBe(ticket.bonusAt);
+      await page.reload();
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sistemas Inteligentes');
+    }
+    expect(newCoupons).toBe(0);
+    expect(await (await request.get('/api/admin/stats')).json()).toEqual(before);
+  });
+}

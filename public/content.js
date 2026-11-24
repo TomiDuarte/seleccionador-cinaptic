@@ -51,9 +51,9 @@ export const careers = [
 // Las opciones rotan para evitar que una posición favorezca siempre una línea.
 export const questions = [
   { id: 'feria', title: 'Llegás a una feria de tecnología. ¿Dónde te quedás?', subtitle: 'Elegí lo que te dé más curiosidad.', options: [
-    { text: 'En sensores que envían mediciones del ambiente a través de una red.', line: 'comunicaciones' },
-    { text: 'En un equipo que descubre qué necesita la gente antes de crear una app.', line: 'software' },
-    { text: 'En una computadora que aprende a reconocer semillas en imágenes.', line: 'inteligentes' },
+    { text: 'En dispositivos que se conectan y comparten información entre sí.', line: 'comunicaciones' },
+    { text: 'En un equipo que transforma las ideas de la gente en soluciones digitales.', line: 'software' },
+    { text: 'En una computadora que aprende a reconocer patrones mediante figuras.', line: 'inteligentes' },
   ] },
   { id: 'barrio', title: 'Tu ciudad busca soluciones con tecnología. ¿A qué equipo te sumarías?', subtitle: 'No hace falta saber hacerlo todavía.', options: [
     { text: 'Al que organiza la información pública y mejora su calidad para tomar decisiones.', line: 'software' },
