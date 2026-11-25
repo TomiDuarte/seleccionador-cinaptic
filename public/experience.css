@@ -119,6 +119,23 @@
 .dialog-actions { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:20px; }
 .dialog-actions .button { flex:1; }
 .button.danger { background:var(--danger-bg); color:var(--danger); border-color:var(--danger); }
+
+.curiosity-radar { margin:24px 0 0; }
+.radar-canvas { position:relative; padding:38px 0 42px; max-width:420px; margin:auto; }
+.radar-chart { display:block; width:100%; height:auto; overflow:visible; }
+.radar-grid polygon,.radar-axes line { fill:none; stroke:var(--muted); stroke-width:1; stroke-opacity:.42; vector-effect:non-scaling-stroke; }
+.radar-grid polygon:last-child { stroke-opacity:.7; }
+.radar-area { fill:var(--lavender); fill-opacity:.38; stroke:var(--lavender); stroke-width:2.5; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.radar-point { fill:var(--lavender); stroke:var(--surface); stroke-width:1.5; vector-effect:non-scaling-stroke; }
+.radar-label { position:absolute; width:46%; text-align:center; color:var(--text); font-size:.875rem; line-height:1.35; }
+.radar-label span { display:block; }
+.radar-label strong { display:block; color:var(--lavender); font-size:1rem; margin-top:5px; font-variant-numeric:tabular-nums; }
+.radar-label-0 { top:0; left:50%; transform:translateX(-50%); width:100%; }
+.radar-label-1 { bottom:0; right:0; }
+.radar-label-2 { bottom:0; left:0; }
+.curiosity-radar figcaption { margin-top:18px; color:var(--muted); font-size:.875rem; text-align:center; }
+.celebrating .radar-result { transform-origin:160px 140px; animation:radar-reveal .8s cubic-bezier(.22,.8,.35,1) both; }
+@keyframes radar-reveal { from { opacity:0; transform:scale(.1); } to { opacity:1; transform:scale(1); } }
 .button.danger:hover { filter:brightness(1.1); }
 .dialog-close { margin:0 0 16px auto; font-size:1.7rem; }
 #share-dialog .field-label { text-align:left; }
@@ -206,6 +223,7 @@ body[data-view="quiz"] .header-pill { display:none; }
 /* Institutional navy and cyan, with the logo's green and orange as accents.
    The original purple hat artwork remains untouched. */
 .hero h1 span,.result-header h1 { color:var(--brand); }
+@media(max-width:600px) { .result-header h1 { font-size:clamp(2rem,9vw,2.8rem); overflow-wrap:anywhere; } }
 .button { background:var(--accent-button); color:var(--button-text); }
 .button:hover { background:var(--accent-button); filter:brightness(1.08); }
 .button.secondary { color:var(--text); background:transparent; border-color:var(--border); }
