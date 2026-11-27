@@ -6,10 +6,12 @@
 [data-theme="light"] .logo-light { display:block; }
 [data-theme="light"] .logo-dark { display:none; }
 .site-footer { align-items:center; }
-.footer-credits { width:100%; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 24px; border-top:1px solid var(--border); padding-top:18px; margin-top:8px; font-size:.875rem; }
+.footer-credits { display:flex; flex-direction:column; align-items:flex-end; align-self:flex-end; max-width:100%; margin-left:auto; gap:8px; text-align:right; font-size:.875rem; }
 .footer-credits strong { color:var(--text); font-weight:600; }
-.credit-links { display:flex; flex-wrap:wrap; gap:8px 20px; }
-.site-footer .credit-links a { display:inline-flex; align-items:center; min-height:44px; color:var(--mint); font-size:.875rem; }
+.credit-links { display:flex; justify-content:flex-end; gap:8px; }
+.site-footer .credit-links a { display:grid; place-items:center; width:44px; height:44px; border:1px solid var(--border); border-radius:50%; color:var(--mint); transition:background .2s,transform .2s; }
+.credit-links svg { display:block; width:21px; height:21px; }
+.site-footer .credit-links a:hover { background:var(--surface-soft); transform:translateY(-2px); }
 .university-link { display:block; border-radius:6px; }
 .university-logo { width:238px; height:auto; }
 .theme-toggle,.close-button { display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; border:1px solid var(--border); border-radius:50%; background:var(--surface); color:var(--text); }
