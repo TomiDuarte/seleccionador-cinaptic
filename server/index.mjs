@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve, extname, sep } from 'node:path';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import { createPostgresStore } from './store.mjs';
+import { databaseUrl } from './database-config.mjs';
 import { config } from '../public/content.js';
 import { eventClosed, eventStatus } from '../public/event.js';
 
@@ -19,12 +20,7 @@ const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const digest = value => createHash('sha256').update(value).digest();
 
 export function createApp({ database = resolve(root, process.env.DATABASE_PATH || '.data/cinaptic.sqlite'), password = process.env.ADMIN_PASSWORD || '', secureCookie = process.env.COOKIE_SECURE === 'true', now = Date.now } = {}) {
-  const postgresUrl =
-    process.env.DATABASE_URL ||
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_PRISMA_URL ||
-    process.env.POSTGRES_URL_NON_POOLING ||
-    process.env.NEON_DATABASE_URL;
+  const postgresUrl = databaseUrl();
   const missingDatabase = Boolean(process.env.VERCEL && !postgresUrl);
   const storeReady = postgresUrl
     ? createPostgresStore(postgresUrl)
