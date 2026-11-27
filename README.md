@@ -49,6 +49,8 @@ Las bases SQLite y PostgreSQL incorporan automáticamente una columna nullable `
 
 ## Operar el stand
 
+El botón **Ver ya canjeados** abre el historial de la edición actual, con nombre, carrera, código y fechas del premio inicial y del extra, en hora argentina. Se consulta en la base de datos y sigue disponible al recargar. El listado muestra 50 participantes por página, permite actualizarlo y se refresca después de registrar un canje. Solo es accesible con sesión del equipo. No reconstruye registros perdidos antes de conectar PostgreSQL.
+
 1. Abrir `/admin` en los dispositivos del equipo e ingresar la contraseña configurada.
 2. Escribir el código que muestra el visitante y tocar **Consultar**. Se muestran su nombre, carrera y el estado de sus canjes.
 3. Tocar **Confirmar canje inicial**. Entregar el premio cuando aparezca la confirmación de registro.

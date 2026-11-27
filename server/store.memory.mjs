@@ -78,6 +78,12 @@ export function createMemoryStore() {
       }
       return expose(row);
     },
+    redeemed(offset = 0, limit = 51) {
+      return [...participations.values()].filter(row => row.baseAt || row.bonusAt)
+        .sort((a, b) => (b.bonusAt || b.baseAt).localeCompare(a.bonusAt || a.baseAt) || a.code.localeCompare(b.code))
+        .slice(offset, offset + limit)
+        .map(({ code, name, career, baseAt, bonusAt }) => ({ code, name, career, baseAt, bonusAt }));
+    },
     stats() {
       const rows = [...participations.values()];
       return {

@@ -15,6 +15,31 @@ import { eventEndTime } from '../public/event.js';
 
 const answers = [0,2,1,0,1,2];
 const key = () => randomBytes(32).toString('hex');
+test('historial privado de canjes incluye datos y fechas, pagina sin exponer respuestas', async t => {
+  const { request, login } = await withApp(t);
+  assert.equal((await request('/api/admin/redeemed')).status, 401);
+  const cookie = await login();
+  assert.deepEqual(await (await request('/api/admin/redeemed', undefined, cookie)).json(), { items: [], hasMore: false });
+  for (const offset of ['-1', 'abc', '1.5']) assert.equal((await request(`/api/admin/redeemed?offset=${offset}`, undefined, cookie)).status, 400);
+  const pending = await (await request('/api/participations', { key: key(), career: 'otra', answers })).json();
+  let last;
+  for (let i = 0; i < 52; i++) {
+    last = await (await request('/api/participations', { key: key(), name: `Participante ${i}`, career: 'sistemas', answers })).json();
+    await request('/api/admin/redeem', { code: last.code, kind: 'base' }, cookie);
+  }
+  const bonus = await (await request('/api/admin/redeem', { code: last.code, kind: 'bonus', confirmed: true }, cookie)).json();
+  const first = await (await request('/api/admin/redeemed', undefined, cookie)).json();
+  const second = await (await request('/api/admin/redeemed?offset=50', undefined, cookie)).json();
+  assert.equal(first.items.length, 50); assert.equal(first.hasMore, true);
+  assert.equal(second.items.length, 2); assert.equal(second.hasMore, false);
+  const all = [...first.items, ...second.items];
+  assert.equal(new Set(all.map(x => x.code)).size, 52);
+  assert.ok(!all.some(x => x.code === pending.code));
+  const row = all.find(x => x.code === last.code);
+  assert.equal(row.name, 'Participante 51'); assert.equal(row.career, 'sistemas');
+  assert.equal(row.baseAt, bonus.baseAt); assert.equal(row.bonusAt, bonus.bonusAt);
+  assert.deepEqual(Object.keys(row).sort(), ['baseAt', 'bonusAt', 'career', 'code', 'name']);
+});
 async function withApp(t, options = {}) {
   const password = randomBytes(24).toString('hex');
   const server = createApp({ database: ':memory:', password, now: () => Date.parse('2026-11-27T21:00:00-03:00'), ...options });

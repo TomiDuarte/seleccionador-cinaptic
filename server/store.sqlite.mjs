@@ -69,6 +69,9 @@ export function createStore(filename) {
       }
       return this.lookup(code);
     },
+    redeemed(offset = 0, limit = 51) {
+      return db.prepare('SELECT code, name, career, base_at AS baseAt, bonus_at AS bonusAt FROM participations WHERE event=? AND (base_at IS NOT NULL OR bonus_at IS NOT NULL) ORDER BY COALESCE(bonus_at, base_at) DESC, code ASC LIMIT ? OFFSET ?').all(config.eventId, limit, offset);
+    },
     stats() { return db.prepare('SELECT COUNT(*) AS participants, COUNT(base_at) AS redeemed, COUNT(bonus_at) AS extras FROM participations WHERE event=?').get(config.eventId); },
     close() { db.close(); },
   };

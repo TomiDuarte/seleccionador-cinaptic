@@ -1,4 +1,11 @@
 .career-label { margin-top: 22px; }
+.history-title { font-size: 1.5rem; margin: 24px 0 12px; }
+.redeemed-list { list-style: none; padding: 0; margin: 20px 0; }
+.redeemed-list li { border-top: 1px solid var(--border); padding: 20px 0; overflow-wrap: anywhere; }
+.redeemed-list h3 { font-size: 1.15rem; margin-bottom: 8px; }
+.redeemed-list code { display: block; margin-top: 12px; font-size: 1rem; }
+.history-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.history-page { margin-top: 12px; }
 .profile-privacy { margin-top: 16px; font-size: .9rem; }
 .participant-details { display: grid; grid-template-columns: auto 1fr; gap: 8px 18px; margin: 20px 0; }
 .participant-details dt { color: var(--muted); }

@@ -121,6 +121,15 @@ export async function createPostgresStore(connectionString) {
       }
       return expose(updated[0]);
     },
+    async redeemed(offset = 0, limit = 51) {
+      return await sql`
+        SELECT code, name, career, base_at AS "baseAt", bonus_at AS "bonusAt"
+        FROM participations
+        WHERE event = ${config.eventId} AND (base_at IS NOT NULL OR bonus_at IS NOT NULL)
+        ORDER BY COALESCE(bonus_at, base_at) DESC, code ASC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+    },
     async stats() {
       const rows = await sql`
         SELECT

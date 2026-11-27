@@ -137,6 +137,12 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
           res.setHeader('Set-Cookie', cookie('', 0)); return json(200, { ok: true });
         }
         if (url.pathname === '/api/admin/stats' && req.method === 'GET') return json(200, await store.stats());
+        if (url.pathname === '/api/admin/redeemed' && req.method === 'GET') {
+          const offset = Number(url.searchParams.get('offset') || 0);
+          if (!Number.isSafeInteger(offset) || offset < 0) return json(400, { error: 'Página inválida.' });
+          const rows = await store.redeemed(offset, 51);
+          return json(200, { items: rows.slice(0, 50), hasMore: rows.length > 50 });
+        }
         if (url.pathname === '/api/admin/coupon' && req.method === 'GET') {
           const result = await store.lookup((url.searchParams.get('code') || '').trim().toUpperCase());
           return json(result ? 200 : 404, result || { error: 'No encontramos ese código. Revisá las letras y los números.' });
