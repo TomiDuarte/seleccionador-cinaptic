@@ -25,10 +25,11 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
     process.env.POSTGRES_PRISMA_URL ||
     process.env.POSTGRES_URL_NON_POOLING ||
     process.env.NEON_DATABASE_URL;
+  const missingDatabase = Boolean(process.env.VERCEL && !postgresUrl);
   const storeReady = postgresUrl
     ? createPostgresStore(postgresUrl)
-    : process.env.VERCEL
-      ? import('./store.memory.mjs').then(({ getSharedMemoryStore }) => getSharedMemoryStore())
+    : missingDatabase
+      ? Promise.resolve(null)
       : import('./store.sqlite.mjs').then(({ createStore }) => createStore(database));
   const sessions = new Map();
   const limits = new Map();
@@ -60,11 +61,23 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
           return res.end(req.method === 'HEAD' ? undefined : body);
         } catch { return json(404, { error: 'No encontrado.' }); }
       }
-      if (url.pathname === '/api/health' && req.method === 'GET') return json(200, {
-        ok: true,
-        database: postgresUrl ? 'postgres' : process.env.VERCEL ? 'memory' : 'sqlite',
+      if (url.pathname === '/api/health' && req.method === 'GET') return json(missingDatabase ? 503 : 200, {
+        ok: !missingDatabase,
+        database: postgresUrl ? 'postgres' : missingDatabase ? 'unconfigured' : 'sqlite',
       });
       if (url.pathname === '/api/event' && req.method === 'GET') return json(200, eventStatus(now()));
+      if (['/api/participations', '/api/participations/retake'].includes(url.pathname) && req.method === 'POST' && eventClosed(now())) return json(410, {
+        error: 'La Noche de las Universidades terminó. Ya no se emiten códigos. Contactá al CInApTIC para seguir en contacto.',
+        code: 'EVENT_CLOSED', ...eventStatus(now()),
+      });
+      // A serverless process can disappear or serve only some requests. Never
+      // present coupons or redemption history backed only by process memory.
+      if (missingDatabase) return json(503, {
+        code: 'STORAGE_UNAVAILABLE',
+        error: url.pathname.startsWith('/api/admin/')
+          ? 'Falta conectar la base de datos permanente (PostgreSQL/Neon) en Vercel. No podemos verificar los códigos ni sus canjes. Un código emitido anteriormente puede haber perdido su registro; no significa que esté mal escrito.'
+          : 'El registro de premios está temporalmente fuera de servicio. Tus respuestas siguen guardadas. Avisá al equipo del stand.',
+      });
       const store = await storeReady;
       if (!['GET', 'POST'].includes(req.method)) return json(405, { error: 'Método no permitido.' });
       let body = {};
@@ -92,6 +105,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         : token && sessions.get(token) > Date.now();
       const cookie = (value, age) => `cinaptic_session=${value}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${age}${secureCookie ? '; Secure' : ''}`;
       if (['/api/participations', '/api/participations/retake'].includes(url.pathname) && req.method === 'POST') {
+        // Recheck after parsing the body in case the deadline passed meanwhile.
         if (eventClosed(now())) return json(410, {
           error: 'La Noche de las Universidades terminó. Ya no se emiten códigos. Contactá al CInApTIC para seguir en contacto.',
           code: 'EVENT_CLOSED', ...eventStatus(now()),
@@ -145,7 +159,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
       else res.end();
     }
   });
-  server.on('close', () => storeReady.then(store => store.close()));
+  server.on('close', () => storeReady.then(store => store?.close()).catch(() => {}));
   return server;
 }
 

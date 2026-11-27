@@ -260,3 +260,31 @@ test('migración de SQLite conserva códigos y canjes anteriores sin inventar no
     rmSync(target, { recursive: true, force: true });
   }
 });
+
+test('Vercel sin base permanente no emite códigos ni informa que un código válido está mal escrito', async t => {
+  const previous = process.env.VERCEL;
+  process.env.VERCEL = '1';
+  t.after(() => { process.env.VERCEL = previous; });
+  let time = eventEndTime - 60000;
+  const { request } = await withApp(t, { now: () => time });
+  const health = await request('/api/health');
+  assert.equal(health.status, 503);
+  assert.deepEqual(await health.json(), { ok: false, database: 'unconfigured' });
+  for (const path of ['/api/participations', '/api/participations/retake', '/api/admin/redeem']) {
+    const response = await request(path, { key: key(), name: 'Ana', career: 'otra', answers, code: 'CN-GDNNV-VGFVK', kind: 'base' });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'STORAGE_UNAVAILABLE');
+  }
+  const lookup = await request('/api/admin/coupon?code=CN-GDNNV-VGFVK');
+  assert.equal(lookup.status, 503);
+  assert.match((await lookup.json()).error, /base de datos permanente/);
+  assert.equal((await request('/api/admin/stats')).status, 503);
+  assert.equal((await request('/api/participation')).status, 503);
+  assert.equal((await request('/api/admin/login', { password: 'anything' })).status, 503);
+  for (const path of ['/', '/admin', '/app.js', '/api/event']) assert.equal((await request(path)).status, 200);
+  time = eventEndTime;
+  assert.equal((await (await request('/api/event')).json()).closed, true);
+  const closed = await request('/api/participations', { key: key(), career: 'otra', answers });
+  assert.equal(closed.status, 410);
+  assert.equal((await closed.json()).code, 'EVENT_CLOSED');
+});
