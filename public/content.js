@@ -4,7 +4,7 @@ export const config = {
   eventId: 'noche-universidades-2026-v2',
   title: 'La Noche de las Universidades',
   center: 'CInApTIC',
-  contactUrl: '', // https://wa.me/..., formulario o mailto:... cuando se confirme.
+  contactUrl: 'https://www.instagram.com/cinaptic.frre/',
   officialUrl: 'https://www.frre.utn.edu.ar/secretaria_de_ciencia_y_tecnologia/investigacion/CInApTIC/',
   publicUrl: '', // URL HTTPS definitiva para compartir. Vacío usa el origen actual.
   reward: 'un caramelo o chupetín',

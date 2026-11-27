@@ -24,7 +24,7 @@ Para probar desde un teléfono, conectarlo al mismo Wi-Fi y abrir `http://IP-LOC
 ## Experiencia incluida
 
 1. Inicio sin nombres ni explicaciones de las líneas para invitar a responder desde la curiosidad. Después de completar el quiz se habilitan Comunicaciones, Ingeniería de Software y Sistemas Inteligentes, con proyectos desplegables, formas orgánicas y animaciones al entrar en pantalla. El resultado enlaza a esa sección y destaca la afinidad encontrada. El acceso permanece disponible al recargar o repetir el quiz; entrar a `#lineas` sin haber terminado muestra la invitación a responder.
-2. Selección de carrera, con opciones para secundaria y personas que aún están explorando.
+2. Nombre obligatorio y selección de carrera, con opciones para secundaria y personas que aún están explorando. Ambos se guardan junto al código y se muestran al consultarlo en el panel.
 3. Seis preguntas situacionales. Cada elección suma un punto a una línea; la carrera no condiciona el resultado.
 4. Resultado explicado, gráfico radar con un eje fijo por línea y escala de 0 a 6 elecciones, puntajes legibles y empates explícitos. El gráfico usa SVG, se adapta al celular y tiene una descripción para lectores de pantalla. Es una actividad de divulgación, no un instrumento vocacional validado.
 5. Código aleatorio emitido en el servidor y guardado en SQLite o PostgreSQL según el entorno. Repetir la solicitud con el mismo identificador y edición devuelve el mismo código y resultado.
@@ -37,17 +37,27 @@ Si una participación antigua sigue en el navegador pero ya no existe en el serv
 
 Los visitantes conservan el progreso en su navegador. Si una solicitud falla pueden reintentar. El resultado puede recuperarse al recargar. El estado de canje se actualiza automáticamente al entrar al resultado, volver a la pestaña o recuperar la conexión, y cada 15 segundos mientras se visualiza. La revelación final ocupa la pantalla sin recuadro durante al menos 3,5 segundos para leer el mensaje; con movimiento reducido se mantiene ese tiempo sin animaciones.
 
+## Cierre del evento y vista previa
+
+A partir del **viernes 27/11/2026 a las 22:00 de Argentina** (`2026-11-28T01:00:00Z`), el sitio reemplaza el cuestionario y los códigos por una pantalla de agradecimiento, contacto en **[@cinaptic.frre](https://www.instagram.com/cinaptic.frre/)** y acceso a los proyectos del centro. Las pestañas abiertas también cambian al llegar la hora. La fecha con su zona horaria está en `public/event.js`.
+
+Abrir **http://localhost:3000/?vista=cierre** con `npm start` para ver el cierre antes de la hora. En el sitio publicado, agregar `?vista=cierre` a la URL. La vista previa solo fuerza la pantalla de cierre; no modifica la fecha del servidor ni emite códigos.
+
+`GET /api/event` informa la hora del servidor y el estado del evento. Desde el límite, el servidor rechaza emisión y repetición con HTTP 410 y `EVENT_CLOSED`, aunque se manipule el reloj del teléfono. El panel sigue permitiendo consultar los registros anteriores y sus canjes.
+
+Las bases SQLite y PostgreSQL incorporan automáticamente una columna nullable `name`, sin borrar participaciones ni canjes. Los registros anteriores se muestran como “Sin nombre registrado”. Las pruebas usan un reloj inyectado previo al evento; el servidor normal siempre usa la hora real.
+
 ## Operar el stand
 
 1. Abrir `/admin` en los dispositivos del equipo e ingresar la contraseña configurada.
-2. Escribir el código que muestra el visitante y tocar **Consultar**.
+2. Escribir el código que muestra el visitante y tocar **Consultar**. Se muestran su nombre, carrera y el estado de sus canjes.
 3. Tocar **Confirmar canje inicial**. Entregar el premio cuando aparezca la confirmación de registro.
 4. Para el extra, pedir que muestre el mensaje o publicación con la invitación, marcar la comprobación y confirmar el canje extra.
 5. Si se pierde la conexión, consultar nuevamente el código antes de entregar. Una solicitud puede haberse registrado aunque no llegara la respuesta.
 
 Las actualizaciones son condicionales y atómicas: dos operadores simultáneos no pueden registrar dos veces el mismo premio. Un canje inicial y uno extra por código. Las sesiones del equipo duran hasta ocho horas y se cierran al reiniciar el servidor.
 
-**Límite del modelo:** un código por identificador de navegador no equivale a una persona identificada. Borrar el almacenamiento, usar modo privado u otro teléfono permite obtener otra participación. El equipo debe controlar esa situación en el stand. No se solicita identidad ni se promete impedir ese abuso.
+**Límite del modelo:** un código por identificador de navegador no equivale a una persona identificada. Borrar el almacenamiento, usar modo privado u otro teléfono permite obtener otra participación mientras el evento está abierto. El equipo debe controlar esa situación en el stand. El nombre es declarado por el visitante; no se verifica su identidad ni se promete impedir ese abuso.
 
 ## Contenido editable
 
@@ -58,7 +68,7 @@ Todo el contenido del cuestionario está en `public/content.js`:
 | `lines` | Descripción, ejemplos, etiquetas y texto del resultado |
 | `careers` | Carreras y etapas del visitante |
 | `questions` | Preguntas, opciones y línea que suma cada opción |
-| `config.contactUrl` | Contacto oficial para sumarse, pendiente de confirmar. Vacío invita al stand |
+| `config.contactUrl` | Instagram del centro: `https://www.instagram.com/cinaptic.frre/` |
 | `config.publicUrl` | URL HTTPS definitiva que se compartirá por WhatsApp |
 | `config.reward` | Texto del premio según disponibilidad |
 | `config.eventId` | Identificador de la edición del evento |
@@ -71,7 +81,7 @@ El 22/11/2026 se inició `noche-universidades-2026-v2` al actualizar las líneas
 
 ## Datos y despliegue
 
-SQLite guarda carrera, respuestas, hash del identificador aleatorio, código y fechas de emisión/canjes en `.data/cinaptic.sqlite`. El código de acceso al panel queda en `.env`; ambos están excluidos de Git. No se piden nombre, correo ni teléfono. El navegador almacena un identificador aleatorio que sirve para recuperar la participación; no se debe compartir.
+SQLite guarda nombre, carrera, respuestas, hash del identificador aleatorio, código y fechas de emisión/canjes en `.data/cinaptic.sqlite`. PostgreSQL conserva los mismos datos. El código de acceso al panel queda en `.env`; ambos están excluidos de Git. No se piden correo ni teléfono. El navegador guarda el nombre y el progreso, además de un identificador aleatorio que sirve para recuperar la participación; no se debe compartir.
 
 Con SQLite se necesita un servidor Node con disco persistente, una única instancia y HTTPS. Para Vercel se usa PostgreSQL/Neon, como se detalla abajo. Un alojamiento exclusivamente estático no ejecuta la validación de canjes. No montar múltiples réplicas con bases independientes.
 

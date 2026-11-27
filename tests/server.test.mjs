@@ -11,16 +11,17 @@ import { join, resolve, basename, sep } from 'node:path';
 import { createApp } from '../server/index.mjs';
 import { createStore } from '../server/store.sqlite.mjs';
 import { createMemoryStore } from '../server/store.memory.mjs';
+import { eventEndTime } from '../public/event.js';
 
 const answers = [0,2,1,0,1,2];
 const key = () => randomBytes(32).toString('hex');
-async function withApp(t) {
+async function withApp(t, options = {}) {
   const password = randomBytes(24).toString('hex');
-  const server = createApp({ database: ':memory:', password });
+  const server = createApp({ database: ':memory:', password, now: () => Date.parse('2026-11-27T21:00:00-03:00'), ...options });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const request = (path, body, cookie, headers = {}) => fetch(base + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(path.startsWith('/api/participations') ? { eventId: config.eventId, ...body } : body) }) });
+  const request = (path, body, cookie, headers = {}) => fetch(base + path, { method: body === undefined ? 'GET' : 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(path.startsWith('/api/participations') ? { eventId: config.eventId, name: 'Ada Lovelace', ...body } : body) }) });
   const login = async () => { const res = await request('/api/admin/login', { password }); assert.equal(res.status, 200); return res.headers.get('set-cookie').split(';')[0]; };
   return { request, login };
 }
@@ -136,7 +137,7 @@ test('la nueva edición deja los códigos de prueba anteriores fuera del panel',
     assert.equal(store.own(participant), null);
     assert.equal(store.lookup(oldCode), null);
     assert.equal(store.stats().participants, 0);
-    const current = store.issue(participant, 'otra', answers);
+    const current = store.issue(participant, 'otra', answers, 'Ada Lovelace');
     assert.notEqual(current.code, oldCode);
     assert.equal(store.stats().participants, 1);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM participations').get().n, 2);
@@ -152,7 +153,7 @@ test('el código y los canjes sobreviven a reiniciar la base', () => {
   const filename = join(folder, 'event.sqlite'); let store;
   try {
     store = createStore(filename); const participant = key();
-    const ticket = store.issue(participant, 'explorando', answers);
+    const ticket = store.issue(participant, 'explorando', answers, 'Ada Lovelace');
     store.redeem(ticket.code, 'base'); store.close(); store = createStore(filename);
     assert.equal(store.own(participant).code, ticket.code);
     assert.ok(store.lookup(ticket.code).baseAt);
@@ -167,7 +168,7 @@ test('el código y los canjes sobreviven a reiniciar la base', () => {
 test('el almacén temporal emite, consulta y canjea participaciones', () => {
   const store = createMemoryStore();
   const participant = key();
-  const ticket = store.issue(participant, 'sistemas', answers);
+  const ticket = store.issue(participant, 'sistemas', answers, 'Ada Lovelace');
   assert.equal(store.own(participant).code, ticket.code);
   assert.equal(store.lookup(ticket.code).code, ticket.code);
   store.redeem(ticket.code, 'base');
@@ -175,19 +176,87 @@ test('el almacén temporal emite, consulta y canjea participaciones', () => {
   assert.deepEqual(store.stats(), { participants: 1, redeemed: 1, extras: 0 });
   store.redeem(ticket.code, 'bonus', true);
   const redeemed = store.lookup(ticket.code);
-  const updated = store.retake(participant, 'otra', questions.map(q => q.options.findIndex(option => option.line === 'inteligentes')));
+  const updated = store.retake(participant, 'otra', questions.map(q => q.options.findIndex(option => option.line === 'inteligentes')), 'Ada Lovelace');
   assert.equal(updated.code, ticket.code);
   assert.equal(updated.createdAt, ticket.createdAt);
   assert.equal(updated.baseAt, redeemed.baseAt);
   assert.equal(updated.bonusAt, redeemed.bonusAt);
   assert.deepEqual(updated.result.topIds, ['inteligentes']);
   assert.deepEqual(store.stats(), { participants: 1, redeemed: 1, extras: 1 });
-  assert.throws(() => store.retake(key(), 'otra', answers), { status: 404 });
+  assert.throws(() => store.retake(key(), 'otra', answers, 'Ada Lovelace'), { status: 404 });
 });
 test('sirve sitio, panel y recursos con políticas del navegador', async t => {
   const { request } = await withApp(t);
   for (const path of ['/', '/admin', '/app.js', '/styles.css', '/hat.svg']) {
     const response = await request(path); assert.equal(response.status, 200);
     assert.ok(response.headers.get('content-security-policy').includes("frame-ancestors 'none'"));
+  }
+});
+
+test('nombre y carrera quedan asociados al código, se validan y son visibles en el panel', async t => {
+  const { request, login } = await withApp(t);
+  const participant = key();
+  for (const name of [undefined, null, '', '   ', 'a'.repeat(101), 123, 'Ana\nMaría']) {
+    assert.equal((await request('/api/participations', { key: participant, name, career: 'sistemas', answers })).status, 400);
+  }
+  const ticket = await (await request('/api/participations', { key: participant, name: '  Ana María  ', career: 'sistemas', answers })).json();
+  assert.equal(ticket.name, 'Ana María');
+  const cookie = await login();
+  const found = await (await request(`/api/admin/coupon?code=${ticket.code}`, undefined, cookie)).json();
+  assert.equal(found.name, 'Ana María');
+  assert.equal(found.career, 'sistemas');
+  const updated = await (await request('/api/participations/retake', { key: participant, name: 'Ana', career: 'quimica', answers })).json();
+  assert.equal(updated.name, 'Ana');
+  assert.equal(updated.career, 'quimica');
+  assert.equal(updated.code, ticket.code);
+});
+
+test('el límite es exactamente el 27/11 a las 22:00 de Argentina y lo impone el servidor', async t => {
+  let time = eventEndTime - 1;
+  const { request, login } = await withApp(t, { now: () => time });
+  const body = { key: key(), name: 'Ana', career: 'otra', answers };
+  assert.equal((await (await request('/api/event')).json()).closed, false);
+  const initial = await (await request('/api/participations', body)).json();
+  assert.match(initial.code, /^CN-/);
+  const cookie = await login();
+  for (time of [eventEndTime, eventEndTime + 1, eventEndTime + 86400000]) {
+    const status = await (await request('/api/event')).json();
+    assert.equal(status.closed, true);
+    assert.equal(status.contactUrl, config.contactUrl);
+    for (const path of ['/api/participations', '/api/participations/retake', '/api/participations?vista=abierto']) {
+      const response = await request(path, body);
+      assert.equal(response.status, 410);
+      assert.equal((await response.json()).code, 'EVENT_CLOSED');
+    }
+    const response = await request('/api/participations', { ...body, key: key() });
+    assert.equal(response.status, 410);
+  }
+  const found = await (await request(`/api/admin/coupon?code=${initial.code}`, undefined, cookie)).json();
+  assert.equal(found.name, 'Ana');
+  assert.equal((await (await request('/api/admin/stats', undefined, cookie)).json()).participants, 1);
+});
+
+test('migración de SQLite conserva códigos y canjes anteriores sin inventar nombres', () => {
+  const folder = mkdtempSync(join(tmpdir(), 'cinaptic-test-'));
+  const filename = join(folder, 'legacy.sqlite');
+  let store;
+  try {
+    const db = new DatabaseSync(filename);
+    db.exec(`CREATE TABLE participations (id INTEGER PRIMARY KEY, event TEXT NOT NULL, token_hash TEXT NOT NULL, code TEXT NOT NULL UNIQUE, career TEXT NOT NULL, answers TEXT NOT NULL, created_at TEXT NOT NULL, base_at TEXT, bonus_at TEXT, UNIQUE(event, token_hash));`);
+    db.prepare('INSERT INTO participations (event,token_hash,code,career,answers,created_at,base_at) VALUES (?,?,?,?,?,?,?)').run(config.eventId, 'old', 'CN-AAAAA-BBBBB', 'otra', JSON.stringify(answers), '2026-11-27T21:00:00Z', '2026-11-27T21:10:00Z');
+    db.close();
+    store = createStore(filename);
+    assert.equal(store.lookup('CN-AAAAA-BBBBB').name, null);
+    assert.equal(store.lookup('CN-AAAAA-BBBBB').baseAt, '2026-11-27T21:10:00Z');
+    const participant = key();
+    store.issue(participant, 'sistemas', answers, 'María');
+    store.close();
+    store = createStore(filename);
+    assert.equal(store.own(participant).name, 'María');
+  } finally {
+    store?.close();
+    const target = resolve(folder);
+    assert.ok(target.startsWith(resolve(tmpdir()) + sep) && basename(target).startsWith('cinaptic-test-'));
+    rmSync(target, { recursive: true, force: true });
   }
 });

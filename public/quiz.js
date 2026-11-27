@@ -8,6 +8,11 @@ export function validAnswers(answers, complete = true) {
 
 export function validCareer(career) { return careers.some(([id]) => id === career); }
 
+export function validName(name) {
+  return typeof name === 'string' && name.trim().length > 0 &&
+    name.trim().length <= 100 && !/[\u0000-\u001f\u007f]/.test(name);
+}
+
 export function calculateResult(answers) {
   if (!validAnswers(answers)) throw new Error('Completá todas las preguntas.');
   const scores = Object.fromEntries(lines.map(line => [line.id, 0]));

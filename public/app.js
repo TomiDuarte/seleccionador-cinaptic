@@ -1,6 +1,7 @@
 import { config, lines, careers, questions } from './content.js';
-import { calculateResult, validAnswers, validCareer } from './quiz.js';
+import { calculateResult, validAnswers, validCareer, validName } from './quiz.js';
 import { renderRadar } from './radar.js';
+import { eventClosed } from './event.js';
 
 const main = document.querySelector('main');
 const storageKey = `cinaptic:${config.eventId}:v1`;
@@ -14,7 +15,7 @@ const paths = {
   chat: '<path d="M21 11a9 9 0 0 1-9 9c-2 0-3-.3-5-1l-5 2 2-5a9 9 0 1 1 17-5Z"/><path d="M8 11h8M8 7h5M8 15h5"/>',
 };
 const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.spark}</svg>`;
-const blankState = () => ({ key: [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join(''), career: '', answers: questions.map(() => null), step: 0, ticket: null, retaking: false });
+const blankState = () => ({ key: [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2, '0')).join(''), name: '', career: '', answers: questions.map(() => null), step: 0, ticket: null, retaking: false });
 let state = blankState();
 let storageAvailable = true;
 try {
@@ -24,12 +25,54 @@ try {
     state = { ...saved, ticket: saved.ticket && /^CN-[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(saved.ticket.code) && validAnswers(saved.ticket.answers) ? { ...saved.ticket, result: calculateResult(saved.ticket.answers) } : null };
   }
 } catch { storageAvailable = false; }
+state.name = validName(state.name) ? state.name : validName(state.ticket?.name) ? state.ticket.name : '';
+if (!state.name && (!state.ticket || state.retaking)) state.step = 0;
 state.retaking = state.retaking === true && !!state.ticket;
 function persist() { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { storageAvailable = false; } }
 persist();
 let toastTimer;
 function toast(message) { document.querySelector('#toast').textContent = message; clearTimeout(toastTimer); toastTimer = setTimeout(() => { document.querySelector('#toast').textContent = ''; }, 5000); }
 function focusHeading() { const heading = main.querySelector('h1'); if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); } window.scrollTo(0, 0); }
+
+// The preview can only close the UI; it can never reopen issuance on the server.
+const closurePreview = new URLSearchParams(location.search).get('vista') === 'cierre';
+let serverClock = Date.now();
+let clockReadAt = performance.now();
+let serverClosed = false;
+const isClosed = () => closurePreview || serverClosed || eventClosed(serverClock + performance.now() - clockReadAt);
+async function syncEvent() {
+  try {
+    const status = await api('/api/event');
+    serverClock = status.serverTime;
+    clockReadAt = performance.now();
+    serverClosed = status.closed;
+  } catch { /* The fixed deadline still applies offline; the API enforces issuance. */ }
+  if (isClosed() && document.body.dataset.view !== 'closed') route();
+}
+function renderClosed() {
+  document.body.dataset.view = 'closed';
+  document.querySelectorAll('dialog[open]').forEach(dialog => dialog.close());
+  const nav = document.querySelector('.header-pill');
+  nav.href = config.contactUrl;
+  nav.target = '_blank';
+  nav.rel = 'noopener noreferrer';
+  nav.textContent = 'Contactanos';
+  main.innerHTML = `${closurePreview ? '<aside class="closure-preview" role="status">Vista previa · Así se verá el sitio al finalizar el evento.<a href="/">Salir de la vista previa</a></aside>' : ''}
+    <section class="hero closed-hero" aria-labelledby="closed-title">
+      <div class="hero-copy"><span class="eyebrow">La Noche de las Universidades · 2026</span>
+        <h1 id="closed-title">La noche terminó.<br><span>Tu curiosidad sigue.</span></h1>
+        <p>¡Gracias por ser parte! El evento finalizó el viernes 27 de noviembre a las 22:00, hora argentina. Ya no se entregan códigos para premios.</p>
+        <p>Las ganas de investigar siguen acá. Escribinos y conversemos sobre cómo sumarte al CInApTIC.</p>
+        <a class="button" href="${esc(config.contactUrl)}" target="_blank" rel="noopener noreferrer">${icon('chat')}Escribinos por Instagram</a>
+        <p class="contact-handle">@cinaptic.frre · CInApTIC / UTN FRRe</p>
+        <a class="closed-web" href="${esc(config.officialUrl)}" target="_blank" rel="noopener noreferrer">Conocé el centro y sus proyectos</a>
+      </div>
+      <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="El sombrero de la investigación, rodeado de estrellas."><span class="art-caption">Nos seguimos encontrando en tus ideas.</span></div>
+    </section>
+    <section class="closed-lines" aria-labelledby="closed-lines-title"><span class="eyebrow">Todavía hay mucho por descubrir</span><h2 id="closed-lines-title">Un lugar para tus próximas ideas.</h2>
+      <div class="line-grid">${lines.map(line => `<article class="line-card ${line.id}"><div class="line-icon">${icon(line.icon)}</div><h3>${line.name}</h3><p class="description">${line.description}</p></article>`).join('')}</div>
+    </section>`;
+}
 function renderHome() {
   const action = state.ticket ? 'Volver a mi resultado' : state.career ? 'Continuar mi descubrimiento' : 'Descubrir mi línea';
   main.innerHTML = `
@@ -42,7 +85,7 @@ function renderHome() {
       <div class="hero-art"><img src="/hat.svg" width="560" height="520" alt="Un sombrero violeta entre órbitas y estrellas, listo para descubrir tu curiosidad.">${(state.ticket ? lines.map(line => line.name) : ['Tu curiosidad', 'Tus ideas', 'Tu próximo descubrimiento']).map((label, i) => `<span class="orbit-tag t${i + 1}">${label}</span>`).join('')}<span class="art-caption">Tu próxima gran idea empieza con curiosidad.</span></div>
     </section>
     <section class="journey" aria-label="Cómo participar">
-      <div class="journey-item">${icon('chat')}<div><strong>Contanos qué te mueve</strong><p>Tu carrera y 6 preguntas cortitas.</p></div></div>
+      <div class="journey-item">${icon('chat')}<div><strong>Contanos qué te mueve</strong><p>Tu nombre, tu carrera y 6 preguntas cortitas.</p></div></div>
       <div class="journey-item">${icon('spark')}<div><strong>Encontrá tu conexión</strong><p>Una línea para empezar a explorar.</p></div></div>
       <div class="journey-item">${icon('gift')}<div><strong>Llevate algo dulce</strong><p>Mostrá tu código en el stand.</p></div></div>
     </section>
@@ -116,23 +159,25 @@ function renderQuiz(previousStep = state.step) {
   main.innerHTML = `<section class="quiz-shell"><div class="quiz-top"><button class="close-button" id="exit-quiz" type="button" aria-label="Salir del cuestionario">×</button><div class="goal-progress"><div class="progress" role="progressbar" aria-label="Progreso hacia tu resultado" aria-valuemin="0" aria-valuemax="7" aria-valuenow="${step}" aria-valuetext="${step} de 7 etapas completadas"><div class="progress-fill step-${step}"></div></div><span class="goal-prize ${step >= 5 ? 'almost' : ''}" aria-hidden="true">${icon('gift')}</span></div></div><p class="goal-caption">${goalLabels[step]}</p>
     <div class="hat-coach ${previousStep < step ? 'cheering' : ''}"><img src="/hat.svg" width="560" height="520" alt=""><p class="hat-speech" role="status">${encouragement[step]}</p></div><div class="question-content ${previousStep < step ? 'question-arriving' : ''}">
     <span class="eyebrow">${step ? 'Seguí tu curiosidad' : 'Primero, nos conocemos'}</span>
-    <h1>${step ? question.title : '¿Qué estás estudiando?'}</h1><p class="question-subtitle">${step ? question.subtitle : 'Todas las curiosidades tienen lugar. Contanos desde dónde venís.'}</p>
-    <form id="quiz-form">${step ? `<fieldset class="options"><legend class="sr-only">${question.title}</legend>${question.options.map((option, i) => `<label class="option"><input type="radio" name="answer" value="${i}" ${state.answers[step - 1] === i ? 'checked' : ''} required><span>${option.text}</span></label>`).join('')}</fieldset>` : `<label class="field-label" for="career">Tu carrera o etapa</label><div class="select-wrap"><select name="career" id="career" required><option value="">Elegí una opción</option>${careers.map(([id, name]) => `<option value="${id}" ${state.career === id ? 'selected' : ''}>${name}</option>`).join('')}</select></div><p class="career-note">${icon('spark')} No necesitás experiencia en investigación. Tu carrera no determina tu resultado.</p>`}
-    <div id="quiz-error" class="error" role="alert"></div><div class="quiz-actions">${step ? '<button class="text-button" type="button" id="back">Volver</button>' : ''}<button class="button" type="submit" id="next" ${step ? state.answers[step - 1] === null ? 'disabled' : '' : !state.career ? 'disabled' : ''}>${step === questions.length ? 'Descubrir mi resultado' : 'Continuar'}</button></div></form>
+    <h1>${step ? question.title : '¿Cómo te llamás y qué estudiás?'}</h1><p class="question-subtitle">${step ? question.subtitle : 'Todas las curiosidades tienen lugar. Contanos desde dónde venís.'}</p>
+    <form id="quiz-form">${step ? `<fieldset class="options"><legend class="sr-only">${question.title}</legend>${question.options.map((option, i) => `<label class="option"><input type="radio" name="answer" value="${i}" ${state.answers[step - 1] === i ? 'checked' : ''} required><span>${option.text}</span></label>`).join('')}</fieldset>` : `<label class="field-label" for="participant-name">Tu nombre</label><input id="participant-name" name="name" type="text" autocomplete="name" maxlength="100" value="${esc(state.name)}" aria-describedby="profile-privacy" required><label class="field-label career-label" for="career">Tu carrera o etapa</label><div class="select-wrap"><select name="career" id="career" required><option value="">Elegí una opción</option>${careers.map(([id, name]) => `<option value="${id}" ${state.career === id ? 'selected' : ''}>${name}</option>`).join('')}</select></div><p id="profile-privacy" class="profile-privacy">Guardamos tu nombre y carrera junto a tu código de participación. El equipo del centro podrá verlos al consultar el código.</p><p class="career-note">${icon('spark')} No necesitás experiencia en investigación. Tu carrera no determina tu resultado.</p>`}
+    <div id="quiz-error" class="error" role="alert"></div><div class="quiz-actions">${step ? '<button class="text-button" type="button" id="back">Volver</button>' : ''}<button class="button" type="submit" id="next" ${step ? state.answers[step - 1] === null ? 'disabled' : '' : !validName(state.name) || !validCareer(state.career) ? 'disabled' : ''}>${step === questions.length ? 'Descubrir mi resultado' : 'Continuar'}</button></div></form>
     </div></section>`;
   if (previousStep !== step && !reducedMotion()) {
     document.querySelector('.progress-fill').animate([{ width: `${previousStep / 7 * 100}%` }, { width: `${step / 7 * 100}%` }], { duration: 450, easing: 'ease-out' });
   }
   document.querySelector('#exit-quiz').onclick = () => confirmExit();
-  document.querySelector('#quiz-form').addEventListener('change', event => {
+  document.querySelector('#quiz-form').addEventListener('input', event => {
     if (event.target.name === 'career') state.career = event.target.value;
+    else if (event.target.name === 'name') state.name = event.target.value;
     else state.answers[step - 1] = Number(event.target.value);
-    document.querySelector('#next').disabled = false; persist();
+    document.querySelector('#next').disabled = !step && (!validName(state.name) || !validCareer(state.career)); persist();
   });
   document.querySelector('#back')?.addEventListener('click', () => { state.step--; persist(); renderQuiz(step); focusHeading(); });
   document.querySelector('#quiz-form').onsubmit = async event => {
     event.preventDefault();
-    if (submitting || (!step && !validCareer(state.career))) return;
+    if (isClosed()) { route(); return; }
+    if (submitting || (!step && (!validCareer(state.career) || !validName(state.name)))) return;
     if (step && state.answers[step - 1] === null) return;
     if (step < questions.length) { state.step++; persist(); renderQuiz(step); focusHeading(); return; }
     submitting = true;
@@ -154,6 +199,7 @@ function renderQuiz(previousStep = state.step) {
       if (location.hash === '#quiz') { celebrateResult = true; location.hash = 'resultado'; }
     } catch (error) {
       reveal.close();
+      if (error.code === 'EVENT_CLOSED') { serverClosed = true; route(); return; }
       const errorBox = document.querySelector('#quiz-error');
       if (errorBox) { errorBox.textContent = error.message; button.disabled = false; button.textContent = 'Reintentar'; document.querySelector('#back').disabled = false; button.focus(); }
     } finally { submitting = false; }
@@ -170,14 +216,14 @@ async function api(path, options = {}) {
 }
 
 async function submitParticipation() {
-  const body = { eventId: config.eventId, key: state.key, career: state.career, answers: [...state.answers] };
+  const body = { eventId: config.eventId, key: state.key, name: state.name.trim(), career: state.career, answers: [...state.answers] };
   try {
     return await api(state.retaking ? '/api/participations/retake' : '/api/participations', { method: 'POST', body: JSON.stringify(body) });
   } catch (error) {
     if (!state.retaking || !state.ticket || (error.status !== 404 && error.code !== 'STORAGE_UNAVAILABLE')) throw error;
     // Old test records may be gone. Keep the original coupon and redemption history;
     // only the recommendation can be calculated locally. Never issue a replacement.
-    return { ...state.ticket, career: body.career, answers: body.answers, result: calculateResult(body.answers), syncPending: true, couponUnavailable: true };
+    return { ...state.ticket, name: body.name, career: body.career, answers: body.answers, result: calculateResult(body.answers), syncPending: true, couponUnavailable: true };
   }
 }
 
@@ -200,6 +246,7 @@ function renderResult() {
     <section class="result-contact"><span class="eyebrow">Esto puede ser el comienzo</span><h2>¿Seguimos esta conversación?</h2><p>Mostranos tu resultado en el stand. Conocé al equipo y consultá cómo dar tus primeros pasos en investigación.</p><div class="result-actions">${config.contactUrl ? `<a class="button" href="${esc(config.contactUrl)}" target="_blank" rel="noopener noreferrer">Quiero sumarme al CInApTIC</a>` : `<a class="button" href="#lineas">Conocer las tres líneas</a>`}<a class="button mint home-button" href="#inicio">Volver al inicio</a></div></section>
     <p class="error" id="result-error" role="alert"></p></section>`;
   celebrateResult = false;
+  if (config.contactUrl) document.querySelector('.home-button').insertAdjacentHTML('beforebegin', '<a class="button secondary" href="#lineas">Conocer las tres líneas</a>');
   document.querySelector('#copy-code').onclick = async () => {
     try { await navigator.clipboard.writeText(ticket.code); toast('Código copiado. ¡Nos vemos en el stand!'); }
     catch { toast('Mantené presionado el código para copiarlo o guardá una captura.'); }
@@ -221,14 +268,14 @@ function renderResult() {
 // Keep redemption status current without asking the visitor to refresh it.
 let syncingTicket = false;
 async function syncTicket() {
-  if (syncingTicket || !state.ticket || location.hash !== '#resultado' || document.hidden) return;
+  if (isClosed() || syncingTicket || !state.ticket || location.hash !== '#resultado' || document.hidden) return;
   syncingTicket = true;
   const revision = ticketRevision;
   try {
     const updated = state.ticket.syncPending
-      ? await api('/api/participations/retake', { method: 'POST', body: JSON.stringify({ eventId: config.eventId, key: state.key, career: state.ticket.career, answers: state.ticket.answers }) })
+      ? await api('/api/participations/retake', { method: 'POST', body: JSON.stringify({ eventId: config.eventId, key: state.key, name: state.ticket.name, career: state.ticket.career, answers: state.ticket.answers }) })
       : await api('/api/participation', { headers: { Authorization: `Bearer ${state.key}` } });
-    if (ticketRevision !== revision) return;
+    if (isClosed() || ticketRevision !== revision) return;
     state.ticket = updated;
     persist();
     if (location.hash !== '#resultado') return;
@@ -240,6 +287,8 @@ async function syncTicket() {
       document.querySelector('.share-panel > p').textContent = 'El stand ya registró tu premio por compartir.';
     }
   } catch (error) {
+    if (isClosed()) return;
+    if (error.code === 'EVENT_CLOSED') { serverClosed = true; route(); return; }
     if ((error.status === 404 || error.code === 'STORAGE_UNAVAILABLE') && revision === ticketRevision) {
       state.ticket.couponUnavailable = true;
       persist();
@@ -297,7 +346,7 @@ document.querySelector('#copy-invitation').onclick = async () => {
 // Keep navigation through the logo or other internal links from discarding the quiz unexpectedly.
 document.addEventListener('click', event => {
   const link = event.target.closest('a');
-  if (!link || location.hash !== '#quiz' || (state.ticket && !state.retaking) || link.target === '_blank' || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  if (isClosed() || !link || location.hash !== '#quiz' || (state.ticket && !state.retaking) || link.target === '_blank' || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
   const destination = new URL(link.href);
   if (destination.origin === location.origin && destination.hash !== '#quiz' && destination.hash !== '#main') {
     event.preventDefault(); confirmExit(() => location.assign(destination.href));
@@ -306,6 +355,7 @@ document.addEventListener('click', event => {
 
 function route() {
   discoveryObserver?.disconnect();
+  if (isClosed()) { renderClosed(); focusHeading(); return; }
   document.body.dataset.view = location.hash === '#quiz' ? 'quiz' : location.hash === '#resultado' ? 'result' : 'home';
   if (location.hash !== '#quiz') document.querySelector('#reveal-dialog').close();
   if (location.hash === '#quiz') renderQuiz();
@@ -314,4 +364,10 @@ function route() {
   focusHeading();
 }
 window.addEventListener('hashchange', route);
+await syncEvent();
 route();
+setInterval(() => { if (isClosed() && document.body.dataset.view !== 'closed') route(); }, 1000);
+setInterval(syncEvent, 60000);
+window.addEventListener('focus', syncEvent);
+window.addEventListener('online', syncEvent);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) void syncEvent(); });

@@ -1,3 +1,5 @@
+import { careers } from './content.js';
+
 const content = document.querySelector('#admin-content');
 const errorBox = document.querySelector('#admin-error');
 const statusBox = document.querySelector('#admin-status');
@@ -37,6 +39,7 @@ async function dashboard() {
 function renderCoupon() {
   const ticket = current;
   document.querySelector('#coupon').innerHTML = `<div class="redeem-row"><p class="admin-code">${esc(ticket.code)}</p><p class="muted">Participación registrada: ${date(ticket.createdAt)}</p></div><div class="redeem-row"><h3>Premio por participar</h3>${ticket.baseAt ? `<p class="done">Canjeado · ${date(ticket.baseAt)}</p>` : '<p>Disponible para entregar.</p><button class="button mint full" id="redeem-base">Confirmar canje inicial</button>'}</div><div class="redeem-row"><h3>Extra por compartir</h3>${ticket.bonusAt ? `<p class="done">Canjeado · ${date(ticket.bonusAt)}</p>` : `<p>${ticket.baseAt ? 'Verificá el mensaje o la publicación antes de entregar el extra.' : 'Primero confirmá el canje inicial.'}</p><label><input type="checkbox" id="confirmed" ${!ticket.baseAt ? 'disabled' : ''}><span>Vi el mensaje o la publicación compartida con la experiencia.</span></label><button class="button secondary full" id="redeem-bonus" disabled>Confirmar canje extra</button>`}</div>`;
+  document.querySelector('.admin-code').insertAdjacentHTML('afterend', `<dl class="participant-details"><dt>Nombre</dt><dd>${esc(ticket.name || 'Sin nombre registrado (participación anterior)')}</dd><dt>Carrera o etapa</dt><dd>${esc(careers.find(([id]) => id === ticket.career)?.[1] || ticket.career)}</dd></dl>`);
   document.querySelector('#redeem-base')?.addEventListener('click', () => redeem('base'));
   document.querySelector('#confirmed')?.addEventListener('change', event => { document.querySelector('#redeem-bonus').disabled = !event.target.checked; });
   document.querySelector('#redeem-bonus')?.addEventListener('click', () => redeem('bonus'));

@@ -1,5 +1,5 @@
 import { randomBytes, createHash } from 'node:crypto';
-import { calculateResult, validAnswers, validCareer } from '../public/quiz.js';
+import { calculateResult, validAnswers, validCareer, validName } from '../public/quiz.js';
 import { config } from '../public/content.js';
 import { neon } from '@neondatabase/serverless';
 
@@ -19,6 +19,7 @@ export async function createPostgresStore(connectionString) {
       UNIQUE(event, token_hash)
     )
   `;
+  await sql`ALTER TABLE participations ADD COLUMN IF NOT EXISTS name TEXT`;
   await sql`
     CREATE TABLE IF NOT EXISTS admin_sessions (
       token_hash TEXT PRIMARY KEY,
@@ -28,6 +29,7 @@ export async function createPostgresStore(connectionString) {
   const hash = key => createHash('sha256').update(key).digest('hex');
   const expose = row => row ? {
     code: row.code,
+    name: row.name || null,
     career: row.career,
     answers: typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers,
     createdAt: row.created_at,
@@ -36,9 +38,9 @@ export async function createPostgresStore(connectionString) {
     result: calculateResult(typeof row.answers === 'string' ? JSON.parse(row.answers) : row.answers),
   } : null;
   return {
-    async issue(key, career, answers) {
-      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
-        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+    async issue(key, career, answers, name) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers) || !validName(name)) {
+        throw Object.assign(new Error('Revisá tu nombre, la carrera y las respuestas.'), { status: 400 });
       }
       const tokenHash = hash(key);
       const existing = await sql`
@@ -53,8 +55,8 @@ export async function createPostgresStore(connectionString) {
         const code = `CN-${chars.slice(0, 5)}-${chars.slice(5, 10)}`;
         try {
           const inserted = await sql`
-            INSERT INTO participations (event, token_hash, code, career, answers, created_at)
-            VALUES (${config.eventId}, ${tokenHash}, ${code}, ${career}, ${JSON.stringify(answers)}::jsonb, ${new Date().toISOString()})
+            INSERT INTO participations (event, token_hash, code, career, answers, created_at, name)
+            VALUES (${config.eventId}, ${tokenHash}, ${code}, ${career}, ${JSON.stringify(answers)}::jsonb, ${new Date().toISOString()}, ${name.trim()})
             ON CONFLICT (event, token_hash) DO NOTHING
             RETURNING *
           `;
@@ -70,13 +72,13 @@ export async function createPostgresStore(connectionString) {
       }
       throw Object.assign(new Error('No pudimos generar un código único. Volvé a intentar.'), { status: 500 });
     },
-    async retake(key, career, answers) {
-      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
-        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+    async retake(key, career, answers, name) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers) || !validName(name)) {
+        throw Object.assign(new Error('Revisá tu nombre, la carrera y las respuestas.'), { status: 400 });
       }
-      // Only answers and career change: the original coupon and redemption dates survive.
+      // Profile and answers change; the original coupon and redemption dates survive.
       const rows = await sql`
-        UPDATE participations SET career = ${career}, answers = ${JSON.stringify(answers)}::jsonb
+        UPDATE participations SET career = ${career}, answers = ${JSON.stringify(answers)}::jsonb, name = ${name.trim()}
         WHERE event = ${config.eventId} AND token_hash = ${hash(key)}
         RETURNING *
       `;

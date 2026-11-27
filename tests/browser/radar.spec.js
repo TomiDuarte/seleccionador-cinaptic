@@ -8,11 +8,11 @@ for (const scores of [[6, 0, 0], [2, 2, 2], [1, 3, 2]]) {
     const key = randomBytes(32).toString('hex');
     const choices = lines.flatMap((line, i) => Array(scores[i]).fill(line.id));
     const answers = questions.map((q, i) => q.options.findIndex(option => option.line === choices[i]));
-    const response = await request.post('/api/participations', { data: { eventId: config.eventId, key, career: 'otra', answers } });
+    const response = await request.post('/api/participations', { data: { eventId: config.eventId, key, name: 'Ada Lovelace', career: 'otra', answers } });
     expect(response.status()).toBe(200);
     const ticket = await response.json();
     await page.goto('/');
-    await page.evaluate(({ eventId, key, ticket }) => localStorage.setItem(`cinaptic:${eventId}:v1`, JSON.stringify({ key, career: 'otra', step: 6, answers: ticket.answers, ticket })), { eventId: config.eventId, key, ticket });
+    await page.evaluate(({ eventId, key, ticket }) => localStorage.setItem(`cinaptic:${eventId}:v1`, JSON.stringify({ key, name: 'Ada Lovelace', career: 'otra', step: 6, answers: ticket.answers, ticket })), { eventId: config.eventId, key, ticket });
     await page.reload();
     await page.goto('/#resultado');
     const panel = page.locator('.result-panel');

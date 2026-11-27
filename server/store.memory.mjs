@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { calculateResult, validAnswers, validCareer } from '../public/quiz.js';
+import { calculateResult, validAnswers, validCareer, validName } from '../public/quiz.js';
 export function createMemoryStore() {
   const participations = new Map();
   const sessions = new Map();
@@ -7,6 +7,7 @@ export function createMemoryStore() {
   const byToken = new Map();
   const expose = row => row ? {
     code: row.code,
+    name: row.name || null,
     career: row.career,
     answers: row.answers,
     createdAt: row.createdAt,
@@ -16,9 +17,9 @@ export function createMemoryStore() {
   } : null;
 
   return {
-    issue(key, career, answers) {
-      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
-        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+    issue(key, career, answers, name) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers) || !validName(name)) {
+        throw Object.assign(new Error('Revisá tu nombre, la carrera y las respuestas.'), { status: 400 });
       }
       const tokenHash = hash(key);
       if (byToken.has(tokenHash)) return expose(byToken.get(tokenHash));
@@ -33,6 +34,7 @@ export function createMemoryStore() {
 
       const row = {
         code,
+        name: name.trim(),
         career,
         answers,
         createdAt: new Date().toISOString(),
@@ -43,13 +45,14 @@ export function createMemoryStore() {
       byToken.set(tokenHash, row);
       return expose(row);
     },
-    retake(key, career, answers) {
-      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
-        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+    retake(key, career, answers, name) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers) || !validName(name)) {
+        throw Object.assign(new Error('Revisá tu nombre, la carrera y las respuestas.'), { status: 400 });
       }
       const row = byToken.get(hash(key));
       if (!row) throw Object.assign(new Error('No encontramos tu participación. Acercate al stand con tu código.'), { status: 404 });
       row.career = career;
+      row.name = name.trim();
       row.answers = [...answers];
       return expose(row);
     },

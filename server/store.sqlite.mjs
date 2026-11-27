@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { calculateResult, validAnswers, validCareer } from '../public/quiz.js';
+import { calculateResult, validAnswers, validCareer, validName } from '../public/quiz.js';
 import { config } from '../public/content.js';
 
 export function createStore(filename) {
@@ -15,16 +15,20 @@ export function createStore(filename) {
       created_at TEXT NOT NULL, base_at TEXT, bonus_at TEXT,
       UNIQUE(event, token_hash)
     );`);
+  // Preserve existing records and their redemption history when upgrading.
+  if (!db.prepare('PRAGMA table_info(participations)').all().some(column => column.name === 'name')) {
+    db.exec('ALTER TABLE participations ADD COLUMN name TEXT');
+  }
   const hash = key => createHash('sha256').update(key).digest('hex');
   const expose = row => row ? {
-    code: row.code, career: row.career, answers: JSON.parse(row.answers),
+    code: row.code, name: row.name || null, career: row.career, answers: JSON.parse(row.answers),
     createdAt: row.created_at, baseAt: row.base_at, bonusAt: row.bonus_at,
     result: calculateResult(JSON.parse(row.answers)),
   } : null;
   return {
-    issue(key, career, answers) {
-      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
-        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+    issue(key, career, answers, name) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers) || !validName(name)) {
+        throw Object.assign(new Error('Revisá tu nombre, la carrera y las respuestas.'), { status: 400 });
       }
       const existing = db.prepare('SELECT * FROM participations WHERE event=? AND token_hash=?').get(config.eventId, hash(key));
       if (existing) return expose(existing);
@@ -35,16 +39,16 @@ export function createStore(filename) {
         const chars = [...bytes].map(b => alphabet[b % alphabet.length]).join('');
         code = `CN-${chars.slice(0,5)}-${chars.slice(5)}`;
       } while (db.prepare('SELECT id FROM participations WHERE code=?').get(code));
-      db.prepare('INSERT INTO participations (event,token_hash,code,career,answers,created_at) VALUES (?,?,?,?,?,?)')
-        .run(config.eventId, hash(key), code, career, JSON.stringify(answers), new Date().toISOString());
+      db.prepare('INSERT INTO participations (event,token_hash,code,career,answers,created_at,name) VALUES (?,?,?,?,?,?,?)')
+        .run(config.eventId, hash(key), code, career, JSON.stringify(answers), new Date().toISOString(), name.trim());
       return this.lookup(code);
     },
-    retake(key, career, answers) {
-      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers)) {
-        throw Object.assign(new Error('Revisá la carrera y las respuestas.'), { status: 400 });
+    retake(key, career, answers, name) {
+      if (typeof key !== 'string' || !/^[a-f0-9]{64}$/.test(key) || !validCareer(career) || !validAnswers(answers) || !validName(name)) {
+        throw Object.assign(new Error('Revisá tu nombre, la carrera y las respuestas.'), { status: 400 });
       }
-      const row = db.prepare('UPDATE participations SET career=?, answers=? WHERE event=? AND token_hash=? RETURNING *')
-        .get(career, JSON.stringify(answers), config.eventId, hash(key));
+      const row = db.prepare('UPDATE participations SET career=?, answers=?, name=? WHERE event=? AND token_hash=? RETURNING *')
+        .get(career, JSON.stringify(answers), name.trim(), config.eventId, hash(key));
       if (!row) throw Object.assign(new Error('No encontramos tu participación. Acercate al stand con tu código.'), { status: 404 });
       return expose(row);
     },

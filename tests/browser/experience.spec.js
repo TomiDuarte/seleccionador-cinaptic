@@ -21,6 +21,7 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
   await expect(page.getByRole('button', { name: 'Ir al inicio', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Salir del cuestionario' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continuar', exact: true })).toBeDisabled();
+  await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Tu carrera o etapa').selectOption('secundaria');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   await page.getByRole('radio').nth(0).check();
@@ -108,6 +109,7 @@ test('recorrido móvil, recuperación, resultado, WhatsApp y canje real', async 
 
 test('fallo de red al terminar permite reintentar sin perder las respuestas', async ({ page }) => {
   await page.goto('/#quiz');
+  await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Tu carrera o etapa').selectOption('explorando');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   for (let i = 0; i < 6; i++) {
@@ -131,6 +133,7 @@ test('320 px, navegación por teclado y almacenamiento dañado', async ({ page }
   await page.reload();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.goto('/#quiz');
+  await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Tu carrera o etapa').selectOption('otra');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   await page.getByRole('radio').first().focus();
@@ -161,6 +164,7 @@ test('temas persistentes, logos y confirmación de salida conservan el progreso'
   await page.screenshot({ path: testInfo.outputPath('inicio-claro.png'), fullPage: true });
   await page.getByRole('link', { name: 'Descubrir mi línea', exact: true }).click();
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
+  await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Tu carrera o etapa').selectOption('otra');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1');
@@ -189,6 +193,7 @@ test('temas persistentes, logos y confirmación de salida conservan el progreso'
 test('movimiento reducido mantiene el tiempo de lectura sin animación', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/#quiz');
+  await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Tu carrera o etapa').selectOption('otra');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   expect(await page.locator('.hat-coach img').evaluate(img => getComputedStyle(img).animationName)).toBe('none');
@@ -212,6 +217,7 @@ for (const [id, name, projectText] of [
   test(`el resultado de ${name} muestra los proyectos actuales`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 320, height: 760 });
     await page.goto('/#quiz');
+    await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
     await page.getByLabel('Tu carrera o etapa').selectOption('otra');
     await page.getByRole('button', { name: 'Continuar', exact: true }).click();
     for (let i = 0; i < questions.length; i++) {
@@ -229,7 +235,7 @@ test('el progreso viejo de prueba no se interpreta con las preguntas nuevas', as
   await page.goto('/');
   await page.evaluate(() => {
     localStorage.setItem('cinaptic:noche-universidades-2026:v1', JSON.stringify({
-      key: 'a'.repeat(64), career: 'sistemas', step: 6, answers: [0,0,0,0,0,0],
+      key: 'a'.repeat(64), name: 'Ada Lovelace', career: 'sistemas', step: 6, answers: [0,0,0,0,0,0],
       ticket: { code: 'CN-AAAAA-BBBBB', answers: [0,0,0,0,0,0] },
     }));
   });
@@ -254,6 +260,7 @@ test('las líneas se descubren después del quiz y permanecen disponibles al vol
     await expect(page.locator('main')).not.toContainText(line.description);
   }
   await page.getByRole('link', { name: 'Empezar el cuestionario', exact: true }).click();
+  await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Tu carrera o etapa').selectOption('otra');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   await page.getByRole('radio').first().check();
@@ -303,7 +310,7 @@ test('las líneas se descubren después del quiz y permanecen disponibles al vol
 test('repetir desde el inicio conserva código y canjes, incluso al salir y recargar', async ({ page, request }, testInfo) => {
   const key = randomBytes(32).toString('hex');
   const originalAnswers = questions.map(q => q.options.findIndex(option => option.line === 'comunicaciones'));
-  const created = await request.post('/api/participations', { data: { eventId: config.eventId, key, career: 'sistemas', answers: originalAnswers } });
+  const created = await request.post('/api/participations', { data: { eventId: config.eventId, key, name: 'Ada Lovelace', career: 'sistemas', answers: originalAnswers } });
   expect(created.status()).toBe(200);
   const ticket = await created.json();
   await request.post('/api/admin/login', { data: { password: 'only-for-automated-tests' } });
@@ -312,12 +319,13 @@ test('repetir desde el inicio conserva código y canjes, incluso al salir y reca
   const before = await (await request.get('/api/admin/stats')).json();
   await page.goto('/');
   await page.evaluate(({ eventId, key, ticket }) => localStorage.setItem(`cinaptic:${eventId}:v1`, JSON.stringify({
-    key, career: ticket.career, answers: ticket.answers, step: 6, ticket, retaking: false,
+    key, name: 'Ada Lovelace', career: ticket.career, answers: ticket.answers, step: 6, ticket, retaking: false,
   })), { eventId: config.eventId, key, ticket });
   await page.reload();
   await expect(page).toHaveTitle('Seleccionador Cinaptic');
   await page.screenshot({ path: testInfo.outputPath('inicio-repetir.png'), fullPage: true, animations: 'disabled' });
   await page.getByRole('button', { name: 'Volver a responder el quiz' }).click();
+  await page.getByLabel('Tu nombre', { exact: true }).fill('Ada Lovelace');
   await page.getByLabel('Tu carrera o etapa').selectOption('otra');
   await page.getByRole('button', { name: 'Continuar', exact: true }).click();
   await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
@@ -359,10 +367,10 @@ for (const recoverable of [false, true]) {
   test(`registro ausente al repetir: resultado local sin otro premio${recoverable ? ' y sincronización posterior' : ''}`, async ({ page, request }, testInfo) => {
     const key = randomBytes(32).toString('hex');
     const initialAnswers = questions.map(q => q.options.findIndex(option => option.line === 'comunicaciones'));
-    let ticket = { code: 'CN-ZZZZZ-YYYYY', career: 'otra', answers: initialAnswers, createdAt: '2026-11-20T12:00:00.000Z', baseAt: '2026-11-20T12:01:00.000Z', bonusAt: '2026-11-20T12:02:00.000Z', result: calculateResult(initialAnswers) };
+    let ticket = { code: 'CN-ZZZZZ-YYYYY', name: 'Ada Lovelace', career: 'otra', answers: initialAnswers, createdAt: '2026-11-20T12:00:00.000Z', baseAt: '2026-11-20T12:01:00.000Z', bonusAt: '2026-11-20T12:02:00.000Z', result: calculateResult(initialAnswers) };
     await request.post('/api/admin/login', { data: { password: 'only-for-automated-tests' } });
     if (recoverable) {
-      ticket = await (await request.post('/api/participations', { data: { eventId: config.eventId, key, career: 'otra', answers: initialAnswers } })).json();
+      ticket = await (await request.post('/api/participations', { data: { eventId: config.eventId, key, name: 'Ada Lovelace', career: 'otra', answers: initialAnswers } })).json();
       await request.post('/api/admin/redeem', { data: { code: ticket.code, kind: 'base' } });
       ticket = await (await request.post('/api/admin/redeem', { data: { code: ticket.code, kind: 'bonus', confirmed: true } })).json();
       await page.route('**/api/participations/retake', route => route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'No encontramos tu participación.' }) }));
@@ -371,7 +379,7 @@ for (const recoverable of [false, true]) {
     let newCoupons = 0;
     page.on('request', req => { if (new URL(req.url()).pathname === '/api/participations' && req.method() === 'POST') newCoupons++; });
     await page.goto('/');
-    await page.evaluate(({ eventId, key, ticket }) => localStorage.setItem(`cinaptic:${eventId}:v1`, JSON.stringify({ key, career: ticket.career, answers: ticket.answers, step: 6, ticket })), { eventId: config.eventId, key, ticket });
+    await page.evaluate(({ eventId, key, ticket }) => localStorage.setItem(`cinaptic:${eventId}:v1`, JSON.stringify({ key, name: 'Ada Lovelace', career: ticket.career, answers: ticket.answers, step: 6, ticket })), { eventId: config.eventId, key, ticket });
     await page.reload();
     await page.getByRole('button', { name: 'Volver a responder el quiz' }).click();
     await page.getByRole('button', { name: 'Continuar', exact: true }).click();

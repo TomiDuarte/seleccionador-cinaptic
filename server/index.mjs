@@ -6,6 +6,7 @@ import { dirname, resolve, extname, sep } from 'node:path';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import { createPostgresStore } from './store.mjs';
 import { config } from '../public/content.js';
+import { eventClosed, eventStatus } from '../public/event.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(resolve(root, '.env'))) {
@@ -17,7 +18,7 @@ if (existsSync(resolve(root, '.env'))) {
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json' };
 const digest = value => createHash('sha256').update(value).digest();
 
-export function createApp({ database = resolve(root, process.env.DATABASE_PATH || '.data/cinaptic.sqlite'), password = process.env.ADMIN_PASSWORD || '', secureCookie = process.env.COOKIE_SECURE === 'true' } = {}) {
+export function createApp({ database = resolve(root, process.env.DATABASE_PATH || '.data/cinaptic.sqlite'), password = process.env.ADMIN_PASSWORD || '', secureCookie = process.env.COOKIE_SECURE === 'true', now = Date.now } = {}) {
   const postgresUrl =
     process.env.DATABASE_URL ||
     process.env.POSTGRES_URL ||
@@ -63,6 +64,7 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         ok: true,
         database: postgresUrl ? 'postgres' : process.env.VERCEL ? 'memory' : 'sqlite',
       });
+      if (url.pathname === '/api/event' && req.method === 'GET') return json(200, eventStatus(now()));
       const store = await storeReady;
       if (!['GET', 'POST'].includes(req.method)) return json(405, { error: 'Método no permitido.' });
       let body = {};
@@ -90,12 +92,16 @@ export function createApp({ database = resolve(root, process.env.DATABASE_PATH |
         : token && sessions.get(token) > Date.now();
       const cookie = (value, age) => `cinaptic_session=${value}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=${age}${secureCookie ? '; Secure' : ''}`;
       if (['/api/participations', '/api/participations/retake'].includes(url.pathname) && req.method === 'POST') {
+        if (eventClosed(now())) return json(410, {
+          error: 'La Noche de las Universidades terminó. Ya no se emiten códigos. Contactá al CInApTIC para seguir en contacto.',
+          code: 'EVENT_CLOSED', ...eventStatus(now()),
+        });
         if (body.eventId !== config.eventId) return json(409, { error: 'Actualizamos el cuestionario. Recargá la página para responder la nueva versión.' });
         // High enough for a shared campus Wi-Fi/NAT; not a one-person identity guarantee.
         limit(`issue:${ip}`, 300, 60000);
         const participation = url.pathname.endsWith('/retake')
-          ? await store.retake(body.key, body.career, body.answers)
-          : await store.issue(body.key, body.career, body.answers);
+          ? await store.retake(body.key, body.career, body.answers, body.name)
+          : await store.issue(body.key, body.career, body.answers, body.name);
         return json(200, participation);
       }
       if (url.pathname === '/api/participation' && req.method === 'GET') {
