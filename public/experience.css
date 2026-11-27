@@ -6,6 +6,10 @@
 [data-theme="light"] .logo-light { display:block; }
 [data-theme="light"] .logo-dark { display:none; }
 .site-footer { align-items:center; }
+.footer-credits { width:100%; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 24px; border-top:1px solid var(--border); padding-top:18px; margin-top:8px; font-size:.875rem; }
+.footer-credits strong { color:var(--text); font-weight:600; }
+.credit-links { display:flex; flex-wrap:wrap; gap:8px 20px; }
+.site-footer .credit-links a { display:inline-flex; align-items:center; min-height:44px; color:var(--mint); font-size:.875rem; }
 .university-link { display:block; border-radius:6px; }
 .university-logo { width:238px; height:auto; }
 .theme-toggle,.close-button { display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; border:1px solid var(--border); border-radius:50%; background:var(--surface); color:var(--text); }
@@ -124,6 +128,11 @@
 .curiosity-radar { margin:28px 0 0; }
 .radar-canvas { position:relative; padding:62px 0 84px; max-width:420px; margin:auto; }
 .radar-chart { display:block; width:100%; height:auto; overflow:visible; }
+.radar-hat-shadow { fill:var(--text); opacity:.07; }
+.radar-hat-brim { fill:url(#radar-brim-fill); stroke:var(--lavender); stroke-width:1; stroke-opacity:.45; }
+.radar-hat-crown { fill:url(#radar-hat-fill); stroke:var(--lavender); stroke-opacity:.65; stroke-width:1.2; }
+.radar-hat-band { fill:var(--surface); fill-opacity:.85; }
+.radar-hat-buckle { fill:none; stroke:#e8c17b; stroke-width:3; }
 .radar-grid polygon,.radar-axes line { fill:none; stroke:var(--muted); stroke-width:1; stroke-opacity:.2; vector-effect:non-scaling-stroke; }
 .radar-grid polygon:nth-child(odd) { stroke-dasharray:2 5; stroke-opacity:.16; }
 .radar-grid polygon:last-child { stroke-opacity:.45; }
